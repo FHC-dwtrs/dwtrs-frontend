@@ -76,3 +76,12 @@ export interface OrgUnit {
   pending: number
   delayed: number
 }
+
+export interface AuthUser {
+  userId: string
+  name: string
+  email: string
+  unit: string | null
+  roles: string[]
+  permissions: string[]
+}
