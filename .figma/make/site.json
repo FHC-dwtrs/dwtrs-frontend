@@ -1,0 +1,10 @@
+{
+  "description": "Streamlines government document approvals with role-based dashboards and a public tracking page for real-time case status updates without login.",
+  "robots": {
+    "index": false
+  },
+  "accessibility": {
+    "addBypassLinks": false,
+    "ignoreReducedMotion": false
+  }
+}
