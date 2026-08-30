@@ -11,6 +11,15 @@ import {
   type OrganizationUnit,
   type UnitType,
 } from '@/api/organizations.api'
+import {
+  getUsers,
+  getUser,
+  createUser,
+  updateUser,
+  updateUserStatus,
+  type User,
+  type UserRole,
+} from '@/api/users.api'
 
 interface Props {
   page: string
@@ -224,27 +233,160 @@ export default function AdminPage({ page, setPage }: Props) {
   )
 }
 
+//---------------------------
+//functions
+//-------------------------
+
+function SectionTitle({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return (
+    <div className="pt-2">
+      <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider">
+        {children}
+      </h4>
+      <div className="border-b border-gray-100 mt-2" />
+    </div>
+  )
+}
+
+function DetailRow({
+  label,
+  value,
+}: {
+  label: string
+  value: React.ReactNode
+}) {
+  return (
+    <div className="flex items-start justify-between gap-4 px-4 py-3">
+      <p className="text-xs text-gray-400 font-semibold uppercase">
+        {label}
+      </p>
+
+      <p className="text-sm text-gray-800 text-right">
+        {value}
+      </p>
+    </div>
+  )
+}
+
 // ───────────────────────────────────────────────────────
 // Users Page
 // ───────────────────────────────────────────────────────
 
 function UsersPage() {
   const [createOpen, setCreateOpen] = useState(false)
+
+  const [users, setUsers] = useState<User[]>([])
+
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+
   const [search, setSearch] = useState('')
   const [selectedRole, setSelectedRole] = useState('')
 
-  const filtered = USERS.filter(
-    u =>
-      u.name.toLowerCase().includes(search.toLowerCase()) &&
-      (selectedRole === '' || u.role === selectedRole)
-  )
+  const [selectedUser, setSelectedUser] =
+    useState<User | null>(null)
+
+  const [detailsOpen, setDetailsOpen] =
+    useState(false)
+
+  const [loadingUser, setLoadingUser] =
+    useState(false)
+
+  async function loadUsers() {
+    try {
+      setLoading(true)
+      setError('')
+
+      const result = await getUsers()
+
+      setUsers(result.data ?? [])
+    } catch (error: any) {
+      console.error(
+        'Failed to load users:',
+        error
+      )
+
+      setError(
+        error.response?.data?.message ||
+          'Failed to load users.'
+      )
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    loadUsers()
+  }, [])
+
+  async function handleUserClick(userId: string) {
+    try {
+      setLoadingUser(true)
+      setError('')
+
+      const result = await getUser(userId)
+
+      setSelectedUser(result.data)
+      setDetailsOpen(true)
+    } catch (error: any) {
+      console.error(
+        'Failed to load user:',
+        error
+      )
+
+      setError(
+        error.response?.data?.message ||
+          'Failed to load user details.'
+      )
+    } finally {
+      setLoadingUser(false)
+    }
+  }
+
+  function handleUserUpdated(updatedUser: User) {
+    setSelectedUser(updatedUser)
+
+    setUsers(currentUsers =>
+      currentUsers.map(user =>
+        user.userId === updatedUser.userId
+          ? updatedUser
+          : user
+      )
+    )
+  }
+
+  const filtered = users.filter(user => {
+    const matchesSearch =
+      user.name
+        .toLowerCase()
+        .includes(search.toLowerCase()) ||
+      user.email
+        .toLowerCase()
+        .includes(search.toLowerCase())
+
+    const matchesRole =
+      selectedRole === '' ||
+      user.roles.some(
+        userRole =>
+          userRole.role.name === selectedRole
+      )
+
+    return matchesSearch && matchesRole
+  })
 
   return (
     <div className="p-6 space-y-4">
+      {/* Header */}
       <div className="flex items-center justify-between">
         <h2
           className="text-xl font-black text-gray-900"
-          style={{ fontFamily: 'var(--font-display)' }}
+          style={{
+            fontFamily: 'var(--font-display)',
+          }}
         >
           User Management
         </h2>
@@ -254,121 +396,795 @@ function UsersPage() {
         </Btn>
       </div>
 
+      {/* Search / Filter */}
       <div className="flex gap-3 flex-wrap">
         <input
           type="text"
           value={search}
-          onChange={e => setSearch(e.target.value)}
+          onChange={e =>
+            setSearch(e.target.value)
+          }
           placeholder="Search users…"
           className="px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#1E4B8F]/20"
         />
 
         <select
           value={selectedRole}
-          onChange={e => setSelectedRole(e.target.value)}
+          onChange={e =>
+            setSelectedRole(e.target.value)
+          }
           className="px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#1E4B8F]/20"
         >
-          <option value="">All Roles</option>
-          <option value="records">Records & Archive</option>
-          <option value="sector">Sector</option>
-          <option value="directorate">Directorate</option>
-          <option value="group">Group</option>
-          <option value="admin">Admin</option>
+          <option value="">
+            All Roles
+          </option>
+
+          <option value="RECORDS_ARCHIVE_STAFF">
+            Records & Archive
+          </option>
+
+          <option value="SECTOR_STAFF">
+            Sector
+          </option>
+
+          <option value="DIRECTORATE_STAFF">
+            Directorate
+          </option>
+
+          <option value="GROUP_STAFF">
+            Group
+          </option>
+
+          <option value="SYSTEM_ADMIN">
+            Admin
+          </option>
         </select>
       </div>
 
+      {/* Error */}
+      {error && (
+        <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-sm">
+          {error}
+        </div>
+      )}
+
+      {/* Table */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-gray-100">
-                {['Name', 'Username', 'Role', 'Unit', 'Status', ''].map(h => (
-                  <th
-                    key={h}
-                    className="text-left px-5 py-3 text-xs font-bold text-gray-400 uppercase tracking-wide"
+        {loading ? (
+          <div className="p-10 text-center">
+            <p className="text-sm text-gray-500">
+              Loading users...
+            </p>
+          </div>
+        ) : filtered.length === 0 ? (
+          <div className="p-10 text-center">
+            <div className="text-4xl mb-3">
+              👥
+            </div>
+
+            <h3 className="font-bold text-gray-900">
+              No users found
+            </h3>
+
+            <p className="text-sm text-gray-500 mt-1">
+              Try changing your search or filter.
+            </p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-gray-100">
+                  {['Name', 'Unit', 'Status'].map(
+                    heading => (
+                      <th
+                        key={heading}
+                        className="text-left px-5 py-3 text-xs font-bold text-gray-400 uppercase tracking-wide"
+                      >
+                        {heading}
+                      </th>
+                    )
+                  )}
+                </tr>
+              </thead>
+
+              <tbody>
+                {filtered.map(user => (
+                  <tr
+                    key={user.userId}
+                    onClick={() =>
+                      handleUserClick(
+                        user.userId
+                      )
+                    }
+                    className="border-b border-gray-50 hover:bg-gray-50 transition-colors cursor-pointer"
                   >
-                    {h}
-                  </th>
-                ))}
-              </tr>
-            </thead>
+                    {/* Name */}
+                    <td className="px-5 py-3.5">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-full bg-[#1E4B8F] flex items-center justify-center text-white text-xs font-bold">
+                          {user.name
+                            .charAt(0)
+                            .toUpperCase()}
+                        </div>
 
-            <tbody>
-              {filtered.map(u => (
-                <tr
-                  key={u.id}
-                  className="border-b border-gray-50 hover:bg-gray-50 transition-colors"
-                >
-                  <td className="px-5 py-3.5">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-[#1E4B8F] flex items-center justify-center text-white text-xs font-bold">
-                        {u.name[0]}
+                        <div>
+                          <span className="font-semibold text-gray-900">
+                            {user.name}
+                          </span>
+
+                          <p className="text-xs text-gray-400 mt-0.5">
+                            {user.email}
+                          </p>
+                        </div>
                       </div>
+                    </td>
 
-                      <span className="font-semibold text-gray-900">
-                        {u.name}
-                      </span>
-                    </div>
-                  </td>
+                    {/* Unit */}
+                    <td className="px-5 py-3.5 text-xs text-gray-500 max-w-[240px]">
+                      {user.unit?.name ||
+                        'No organizational unit'}
+                    </td>
 
-                  <td className="px-5 py-3.5 font-mono text-xs text-gray-600">
-                    {u.username}
-                  </td>
-
-                  <td className="px-5 py-3.5">
-                    <RoleBadge role={u.role} />
-                  </td>
-
-                  <td className="px-5 py-3.5 text-xs text-gray-500 max-w-[200px] truncate">
-                    {u.unit}
-                  </td>
-
-                  <td className="px-5 py-3.5">
-                    <span
-                      className={`text-xs font-semibold px-2 py-1 rounded-full ${
-                        u.status === 'Active'
-                          ? 'bg-green-50 text-green-700'
-                          : 'bg-gray-100 text-gray-500'
-                      }`}
-                    >
-                      {u.status}
-                    </span>
-                  </td>
-
-                  <td className="px-5 py-3.5">
-                    <div className="flex gap-2">
-                      <button className="text-xs text-[#1E4B8F] font-semibold hover:underline">
-                        Edit
-                      </button>
-
-                      <button
-                        className={`text-xs font-semibold hover:underline ${
-                          u.status === 'Active'
-                            ? 'text-red-500'
-                            : 'text-green-600'
+                    {/* Status */}
+                    <td className="px-5 py-3.5">
+                      <span
+                        className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2 py-1 rounded-full ${
+                          user.isActive
+                            ? 'bg-green-50 text-green-700'
+                            : 'bg-gray-100 text-gray-500'
                         }`}
                       >
-                        {u.status === 'Active'
-                          ? 'Deactivate'
-                          : 'Activate'}
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+                        <span
+                          className={`w-1.5 h-1.5 rounded-full ${
+                            user.isActive
+                              ? 'bg-green-500'
+                              : 'bg-gray-400'
+                          }`}
+                        />
+
+                        {user.isActive
+                          ? 'Active'
+                          : 'Inactive'}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
+      {/* Create User */}
       <CreateUserModal
         open={createOpen}
-        onClose={() => setCreateOpen(false)}
+        onClose={() => {
+          setCreateOpen(false)
+          loadUsers()
+        }}
+      />
+
+      {/* User Details */}
+      <UserDetailsModal
+        open={detailsOpen}
+        user={selectedUser}
+        loading={loadingUser}
+        onClose={() => {
+          setDetailsOpen(false)
+          setSelectedUser(null)
+        }}
+        onUpdated={handleUserUpdated}
       />
     </div>
   )
 }
 
+
+function UserDetailsModal({
+  open,
+  user,
+  loading,
+  onClose,
+  onUpdated,
+}: {
+  open: boolean
+  user: User | null
+  loading: boolean
+  onClose: () => void
+  onUpdated: (user: User) => void
+}) {
+  const [editing, setEditing] =
+    useState(false)
+
+  const [name, setName] = useState('')
+  const [email, setEmail] = useState('')
+  const [unitId, setUnitId] = useState('')
+
+  const [organizations, setOrganizations] =
+    useState<OrganizationUnit[]>([])
+
+  const [loadingUnits, setLoadingUnits] =
+    useState(false)
+
+  const [saving, setSaving] =
+    useState(false)
+
+  const [statusUpdating, setStatusUpdating] =
+    useState(false)
+
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    if (!user) return
+
+    if (user) {
+      if (user) {
+        if (user) {
+          setName(user.name)
+        }
+      }
+    }
+    if (user) {
+      setEmail(user.email)
+    }
+    setUnitId(user.unit?.unitId ?? '')
+    setEditing(false)
+    setError('')
+  }, [user])
+
+  useEffect(() => {
+    if (!open || !editing) return
+
+    async function loadUnits() {
+      try {
+        setLoadingUnits(true)
+
+        const result =
+          await getOrganizations({
+            isActive: true,
+          })
+
+        setOrganizations(result.data ?? [])
+      } catch (error: any) {
+        console.error(
+          'Failed to load organizational units:',
+          error
+        )
+
+        setError(
+          error.response?.data?.message ||
+            'Failed to load organizational units.'
+        )
+      } finally {
+        setLoadingUnits(false)
+      }
+    }
+
+    loadUnits()
+  }, [open, editing])
+
+  if (!open) return null
+
+  if (loading) {
+    return (
+      <Modal
+        open={open}
+        onClose={onClose}
+        title="User Details"
+        width="max-w-lg"
+      >
+        <div className="py-10 text-center">
+          <p className="text-sm text-gray-500">
+            Loading user details...
+          </p>
+        </div>
+      </Modal>
+    )
+  }
+
+  if (!user) return null
+
+  async function handleSave() {
+    if (!name.trim()) {
+      setError('Full name is required.')
+      return
+    }
+
+    if (!email.trim()) {
+      setError('Email is required.')
+      return
+    }
+
+    if (!unitId) {
+      setError(
+        'Organizational unit is required.'
+      )
+      return
+    }
+
+    try {
+      setSaving(true)
+      setError('')
+
+      const result = await updateUser(
+        user?.userId ?? '',
+        {
+          name: name.trim(),
+          email: email.trim(),
+          unitId,
+        }
+      )
+
+      onUpdated(result.data)
+
+      setEditing(false)
+    } catch (error: any) {
+      console.error(
+        'Failed to update user:',
+        error
+      )
+
+      setError(
+        error.response?.data?.message ||
+          'Failed to update user.'
+      )
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function handleStatusChange() {
+    const nextStatus = user ? !user.isActive : false
+
+    try {
+      setStatusUpdating(true)
+      setError('')
+
+      const result =
+        await updateUserStatus(
+          user?.userId ?? '',
+          nextStatus
+        )
+
+      onUpdated(result.data)
+    } catch (error: any) {
+      console.error(
+        'Failed to update user status:',
+        error
+      )
+
+      setError(
+        error.response?.data?.message ||
+          'Failed to update user status.'
+      )
+    } finally {
+      setStatusUpdating(false)
+    }
+  }
+
+  function startEditing() {
+    const currentUser = user
+  
+    if (!currentUser) return
+  
+    setEditing(true)
+    setName(currentUser.name)
+    setEmail(currentUser.email)
+    setUnitId(currentUser.unit?.unitId ?? '')
+  }
+
+  function cancelEditing() {
+    const currentUser = user
+  
+    if (!currentUser) return
+  
+    setEditing(false)
+    setName(currentUser.name)
+    setEmail(currentUser.email)
+    setUnitId(currentUser.unit?.unitId ?? '')
+    setError('')
+  }
+  
+  function formatDate(
+    value: string | null
+  ) {
+    if (!value) return 'Never'
+
+    return new Date(value).toLocaleString(
+      undefined,
+      {
+        dateStyle: 'medium',
+        timeStyle: 'short',
+      }
+    )
+  }
+
+  return (
+    <Modal
+      open={open}
+      onClose={onClose}
+      title="User Details"
+      width="max-w-lg"
+    >
+      <div className="space-y-5">
+        {/* User Header */}
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 rounded-xl bg-[#EEF4FF] flex items-center justify-center text-xl">
+            👤
+          </div>
+
+          <div className="flex-1">
+            <h3 className="text-lg font-bold text-gray-900">
+              {user.name}
+            </h3>
+
+            <p className="text-xs text-gray-500 mt-0.5">
+              {user.email}
+            </p>
+          </div>
+
+          {/* Status Toggle */}
+          <button
+            type="button"
+            disabled={statusUpdating}
+            onClick={handleStatusChange}
+            className={`relative w-11 h-6 rounded-full transition-colors ${
+              user.isActive
+                ? 'bg-green-500'
+                : 'bg-gray-300'
+            }`}
+            title={
+              user.isActive
+                ? 'Deactivate user'
+                : 'Activate user'
+            }
+          >
+            <span
+              className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-transform ${
+                user.isActive
+                  ? 'translate-x-6'
+                  : 'translate-x-1'
+              }`}
+            />
+          </button>
+
+          <span
+            className={`text-xs font-semibold ${
+              user.isActive
+                ? 'text-green-600'
+                : 'text-gray-500'
+            }`}
+          >
+            {user.isActive
+              ? 'Active'
+              : 'Inactive'}
+          </span>
+        </div>
+
+        {/* Account Information */}
+        <div>
+          <SectionTitle>
+            Account Information
+          </SectionTitle>
+
+          <div className="border border-gray-100 rounded-xl divide-y divide-gray-100">
+            {/* Name */}
+            <div className="px-4 py-3">
+              <p className="text-xs text-gray-400 font-semibold uppercase">
+                Full Name
+              </p>
+
+              {editing ? (
+                <Input
+                  value={name}
+                  onChange={e =>
+                    setName(e.target.value)
+                  }
+                  className="mt-1"
+                />
+              ) : (
+                <p className="text-sm text-gray-800 mt-1">
+                  {user.name}
+                </p>
+              )}
+            </div>
+
+            {/* Email */}
+            <div className="px-4 py-3">
+              <p className="text-xs text-gray-400 font-semibold uppercase">
+                Email
+              </p>
+
+              {editing ? (
+                <Input
+                  type="email"
+                  value={email}
+                  onChange={e =>
+                    setEmail(e.target.value)
+                  }
+                  className="mt-1"
+                />
+              ) : (
+                <p className="text-sm text-gray-800 mt-1 break-all">
+                  {user.email}
+                </p>
+              )}
+            </div>
+
+            {/* Status */}
+            <div className="px-4 py-3 flex items-center justify-between">
+              <div>
+                <p className="text-xs text-gray-400 font-semibold uppercase">
+                  Status
+                </p>
+
+                <p
+                  className={`text-sm mt-1 font-medium ${
+                    user.isActive
+                      ? 'text-green-600'
+                      : 'text-gray-500'
+                  }`}
+                >
+                  {user.isActive
+                    ? 'Active'
+                    : 'Inactive'}
+                </p>
+              </div>
+
+              <button
+                type="button"
+                disabled={statusUpdating}
+                onClick={handleStatusChange}
+                className={`relative w-11 h-6 rounded-full transition-colors ${
+                  user.isActive
+                    ? 'bg-green-500'
+                    : 'bg-gray-300'
+                }`}
+              >
+                <span
+                  className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-transform ${
+                    user.isActive
+                      ? 'translate-x-6'
+                      : 'translate-x-1'
+                  }`}
+                />
+              </button>
+            </div>
+
+            {/* ID */}
+            <div className="px-4 py-3">
+              <p className="text-xs text-gray-400 font-semibold uppercase">
+                User ID
+              </p>
+
+              <p className="text-xs font-mono text-gray-500 mt-1 break-all">
+                {user.userId}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Organization */}
+        <div>
+          <SectionTitle>
+            Organization
+          </SectionTitle>
+
+          <div className="border border-gray-100 rounded-xl divide-y divide-gray-100">
+            {/* Unit */}
+            <div className="px-4 py-3">
+              <p className="text-xs text-gray-400 font-semibold uppercase">
+                Organizational Unit
+              </p>
+
+              {editing ? (
+                <Select
+                  value={unitId}
+                  onChange={e =>
+                    setUnitId(e.target.value)
+                  }
+                  options={[
+                    {
+                      value: '',
+                      label: loadingUnits
+                        ? 'Loading units...'
+                        : 'Select organizational unit',
+                    },
+                    ...organizations.map(
+                      unit => ({
+                        value: unit.unitId,
+                        label: `${unit.name} (${unit.unitType})`,
+                      })
+                    ),
+                  ]}
+                />
+              ) : (
+                <p className="text-sm text-gray-800 mt-1">
+                  {user.unit?.name ||
+                    'No organizational unit'}
+                </p>
+              )}
+            </div>
+
+            {/* Unit Type */}
+            <div className="px-4 py-3">
+              <p className="text-xs text-gray-400 font-semibold uppercase">
+                Unit Type
+              </p>
+
+              <p className="text-sm text-gray-800 mt-1">
+                {user.unit?.unitType ||
+                  'Not assigned'}
+              </p>
+            </div>
+
+            {/* Parent */}
+            <div className="px-4 py-3">
+              <p className="text-xs text-gray-400 font-semibold uppercase">
+                Parent Unit
+              </p>
+
+              <p className="text-sm text-gray-800 mt-1">
+                {user.unit?.parentUnitId ||
+                  'None — Top Level'}
+              </p>
+            </div>
+
+            {/* Unit Status */}
+            <div className="px-4 py-3">
+              <p className="text-xs text-gray-400 font-semibold uppercase">
+                Unit Status
+              </p>
+
+              <p
+                className={`text-sm mt-1 font-medium ${
+                  user.unit?.isActive
+                    ? 'text-green-600'
+                    : 'text-gray-500'
+                }`}
+              >
+                {user.unit
+                  ? user.unit.isActive
+                    ? 'Active'
+                    : 'Inactive'
+                  : 'Not assigned'}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Roles */}
+        <div>
+          <SectionTitle>
+            Roles & Access
+          </SectionTitle>
+
+          <div className="border border-gray-100 rounded-xl p-4">
+            {user.roles.length === 0 ? (
+              <p className="text-sm text-gray-500">
+                No roles assigned.
+              </p>
+            ) : (
+              <div className="space-y-3">
+                {user.roles.map(
+                  (userRole: UserRole) => (
+                                    <div
+                      key={userRole.roleId}
+                      className="bg-gray-50 rounded-lg p-3"
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="text-sm font-semibold text-gray-800">
+                          {userRole.role.name}
+                        </span>
+
+                        <RoleBadge
+                          role={userRole.role.name}
+                        />
+                      </div>
+
+                      <p className="text-xs text-gray-500 mt-1">
+                        {
+                          userRole.role
+                            .description
+                        }
+                      </p>
+                    </div>
+                  )
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Account Activity */}
+        <div>
+          <SectionTitle>
+            Account Activity
+          </SectionTitle>
+
+          <div className="border border-gray-100 rounded-xl divide-y divide-gray-100">
+            <DetailRow
+              label="Last Login"
+              value={formatDate(
+                user.lastLoginAt
+              )}
+            />
+
+            <DetailRow
+              label="Created"
+              value={formatDate(
+                user.createdAt
+              )}
+            />
+
+            <DetailRow
+              label="Last Updated"
+              value={formatDate(
+                user.updatedAt
+              )}
+            />
+          </div>
+        </div>
+
+        {/* Error */}
+        {error && (
+          <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg px-3 py-2 text-sm">
+            {error}
+          </div>
+        )}
+
+        {/* Actions */}
+        <div className="flex gap-3 pt-1">
+          {editing ? (
+            <>
+              <Btn
+                variant="secondary"
+                onClick={cancelEditing}
+                className="flex-1"
+                disabled={saving}
+              >
+                Cancel
+              </Btn>
+
+              <Btn
+                onClick={handleSave}
+                className="flex-1"
+                disabled={
+                  saving ||
+                  loadingUnits
+                }
+              >
+                {saving
+                  ? 'Saving...'
+                  : 'Save Changes'}
+              </Btn>
+            </>
+          ) : (
+            <>
+              <Btn
+                variant="secondary"
+                onClick={onClose}
+                className="flex-1"
+              >
+                Close
+              </Btn>
+
+              <Btn
+                onClick={() =>
+                  setEditing(true)
+                }
+                className="flex-1"
+              >
+                ✏️ Edit User
+              </Btn>
+            </>
+          )}
+        </div>
+      </div>
+    </Modal>
+  )
+}
 // ───────────────────────────────────────────────────────
 // Role Badge
 // ───────────────────────────────────────────────────────
@@ -431,146 +1247,192 @@ function CreateUserModal({
   open: boolean
   onClose: () => void
 }) {
-  const [role, setRole] = useState('')
+  const [name, setName] = useState('')
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [unitId, setUnitId] = useState('')
+  const [isActive, setIsActive] = useState(true)
+
+  const [organizations, setOrganizations] = useState<
+    OrganizationUnit[]
+  >([])
+
+  const [loadingUnits, setLoadingUnits] = useState(false)
+  const [creating, setCreating] = useState(false)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    if (!open) return
+
+    async function loadUnits() {
+      try {
+        setLoadingUnits(true)
+        setError('')
+
+        const result = await getOrganizations({
+          isActive: true,
+        })
+
+        setOrganizations(result.data ?? [])
+      } catch (error: any) {
+        console.error(
+          'Failed to load organizational units:',
+          error
+        )
+
+        setError(
+          error.response?.data?.message ||
+            'Failed to load organizational units.'
+        )
+      } finally {
+        setLoadingUnits(false)
+      }
+    }
+
+    loadUnits()
+  }, [open])
+
+  function resetForm() {
+    setName('')
+    setEmail('')
+    setPassword('')
+    setUnitId('')
+    setIsActive(true)
+    setError('')
+  }
+
+  function handleClose() {
+    if (creating) return
+
+    resetForm()
+    onClose()
+  }
+
+  async function handleCreateUser() {
+    if (!name.trim()) {
+      setError('Full name is required.')
+      return
+    }
+
+    if (!email.trim()) {
+      setError('Email is required.')
+      return
+    }
+
+    if (!password) {
+      setError('Password is required.')
+      return
+    }
+
+    if (password.length < 8) {
+      setError(
+        'Password must be at least 8 characters.'
+      )
+      return
+    }
+
+    if (!unitId) {
+      setError('Organizational unit is required.')
+      return
+    }
+
+    try {
+      setCreating(true)
+      setError('')
+
+      const payload = {
+        name: name.trim(),
+        email: email.trim(),
+        password,
+        unitId,
+        isActive,
+      }
+
+      console.log('Creating user:', payload)
+
+      await createUser(payload)
+
+      handleClose()
+    } catch (error: any) {
+      console.error(
+        'Failed to create user:',
+        error
+      )
+
+      setError(
+        error.response?.data?.message ||
+          'Failed to create user.'
+      )
+    } finally {
+      setCreating(false)
+    }
+  }
 
   return (
     <Modal
       open={open}
-      onClose={onClose}
+      onClose={handleClose}
       title="Create User"
       width="max-w-lg"
     >
-      <div className="space-y-3">
+      <div className="space-y-4">
+
+        {/* Full Name */}
         <Input
           label="Full Name *"
           placeholder="Abebe Kebede"
+          value={name}
+          onChange={e => setName(e.target.value)}
         />
 
+        {/* Email */}
         <Input
-          label="Username *"
-          placeholder="abebe.k"
-        />
-
-        <Input
-          label="Email"
+          label="Email *"
           type="email"
           placeholder="abebe@fhc.gov.et"
+          value={email}
+          onChange={e => setEmail(e.target.value)}
         />
 
+        {/* Password */}
+        <Input
+          label="Password *"
+          type="password"
+          placeholder="Enter temporary password"
+          value={password}
+          onChange={e => setPassword(e.target.value)}
+        />
+
+        {/* Organizational Unit */}
         <Select
-          label="Role *"
-          value={role}
-          onChange={e => setRole(e.target.value)}
+          label="Organizational Unit *"
+          value={unitId}
+          onChange={e =>
+            setUnitId(e.target.value)
+          }
           options={[
             {
-              value: 'records',
-              label: 'Records & Archive',
+              value: '',
+              label: loadingUnits
+                ? 'Loading units...'
+                : 'Select organizational unit',
             },
-            {
-              value: 'sector',
-              label: 'Sector',
-            },
-            {
-              value: 'directorate',
-              label: 'Directorate',
-            },
-            {
-              value: 'group',
-              label: 'Group',
-            },
-            {
-              value: 'admin',
-              label: 'Admin',
-            },
+
+            ...organizations.map(unit => ({
+              value: unit.unitId,
+              label: `${unit.name} (${unit.unitType})`,
+            })),
           ]}
         />
 
-        {role === 'sector' && (
-          <Select
-            label="Sector *"
-            options={[
-              {
-                value: 'Housing Development Sector',
-                label: 'Housing Development Sector',
-              },
-              {
-                value: 'Corporate Service Sector',
-                label: 'Corporate Service Sector',
-              },
-            ]}
-          />
-        )}
-
-        {role === 'directorate' && (
-          <>
-            <Select
-              label="Sector *"
-              options={[
-                {
-                  value: 'Housing Development Sector',
-                  label: 'Housing Development Sector',
-                },
-              ]}
-            />
-
-            <Select
-              label="Directorate *"
-              options={[
-                {
-                  value: 'Directorate A',
-                  label: 'Directorate A',
-                },
-                {
-                  value: 'Directorate B',
-                  label: 'Directorate B',
-                },
-              ]}
-            />
-          </>
-        )}
-
-        {role === 'group' && (
-          <>
-            <Select
-              label="Sector *"
-              options={[
-                {
-                  value: 'Housing Development Sector',
-                  label: 'Housing Development Sector',
-                },
-              ]}
-            />
-
-            <Select
-              label="Directorate *"
-              options={[
-                {
-                  value: 'Directorate A',
-                  label: 'Directorate A',
-                },
-              ]}
-            />
-
-            <Select
-              label="Group *"
-              options={[
-                {
-                  value: 'Group A1',
-                  label: 'Group A1',
-                },
-                {
-                  value: 'Group A2',
-                  label: 'Group A2',
-                },
-              ]}
-            />
-          </>
-        )}
-
+        {/* Active */}
         <div className="flex items-center gap-2 pt-1">
           <input
             type="checkbox"
-            defaultChecked
+            checked={isActive}
+            onChange={e =>
+              setIsActive(e.target.checked)
+            }
             className="rounded"
           />
 
@@ -578,22 +1440,34 @@ function CreateUserModal({
             Active (user can login immediately)
           </label>
         </div>
+
+        {/* Error */}
+        {error && (
+          <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg px-3 py-2 text-sm">
+            {error}
+          </div>
+        )}
       </div>
 
+      {/* Buttons */}
       <div className="flex gap-3 mt-5">
         <Btn
           variant="secondary"
-          onClick={onClose}
+          onClick={handleClose}
           className="flex-1"
+          disabled={creating}
         >
           Cancel
         </Btn>
 
         <Btn
-          onClick={onClose}
+          onClick={handleCreateUser}
           className="flex-1"
+          disabled={creating || loadingUnits}
         >
-          Create User
+          {creating
+            ? 'Creating...'
+            : 'Create User'}
         </Btn>
       </div>
     </Modal>
