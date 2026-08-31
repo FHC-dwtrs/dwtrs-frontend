@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react'
-import { USERS, AUDIT_LOGS } from '../data'
 import { KpiCard, Btn, Modal, Input, Select } from '../components/ui'
 import { useLanguage } from '../i18n'
 import {
@@ -20,14 +19,59 @@ import {
   type User,
   type UserRole,
 } from '@/api/users.api'
+import { AuditLog, getAuditLogs } from '@/api/audit.api'
 
 interface Props {
   page: string
   setPage: (p: string) => void
 }
 
+function formatDate(date: string) {
+  return new Date(date).toLocaleString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  })
+}
+
 export default function AdminPage({ page, setPage }: Props) {
+  const [recentAuditLogs, setRecentAuditLogs] = useState<AuditLog[]>([])
+const [auditLoading, setAuditLoading] = useState(false)
+const [orgUnits, setOrgUnits] = useState<OrganizationUnit[]>([])
+const [totalUsers, setTotalUsers] = useState(0)
+const [activeUsers, setActiveUsers] = useState(0)
   const { t } = useLanguage()
+
+
+  useEffect(() => {
+    getUsers().then(res => {
+      const users = res.data ?? []
+      setTotalUsers(users.length)
+      setActiveUsers(users.filter(u => u.isActive).length)
+    }).catch(console.error)
+  }, [])
+
+
+  useEffect(() => {
+    async function loadRecentActivity() {
+      try {
+        setAuditLoading(true)
+        const result = await getAuditLogs()
+        setRecentAuditLogs((result.data ?? []).slice(0, 5)) // top 5 for the dashboard widget
+      } catch (error: any) {
+        console.error('Failed to load recent activity:', error)
+      } finally {
+        setAuditLoading(false)
+      }
+    }
+    loadRecentActivity()
+  }, [])
+
+  useEffect(() => {
+    getOrganizations().then(res => setOrgUnits(res.data ?? [])).catch(console.error)
+  }, [])
 
   if (page === 'users') return <UsersPage />
 
@@ -43,6 +87,10 @@ export default function AdminPage({ page, setPage }: Props) {
   if (page === 'audit') return <AuditPage />
   if (page === 'roles') return <RolesPage />
   if (page === 'settings') return <SettingsPage />
+
+
+  const sectorCount = orgUnits.filter(u => u.unitType === 'SECTOR').length
+const directorateCount = orgUnits.filter(u => u.unitType === 'DIRECTORATE').length
 
   // Dashboard
   return (
@@ -62,35 +110,11 @@ export default function AdminPage({ page, setPage }: Props) {
 
       {/* KPIs */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <KpiCard
-          label={t('kpi_totalUsers')}
-          value={86}
-          icon="👥"
-          onClick={() => setPage('users')}
-        />
-
-        <KpiCard
-          label={t('kpi_activeUsers')}
-          value={78}
-          icon="✅"
-          accent="#16A34A"
-        />
-
-        <KpiCard
-          label={t('kpi_sectors')}
-          value={4}
-          icon="🏢"
-          accent="#7C3AED"
-          onClick={() => setPage('sectors')}
-        />
-
-        <KpiCard
-          label={t('kpi_directorates')}
-          value={12}
-          icon="🏛"
-          accent="#2563EB"
-          onClick={() => setPage('directorates')}
-        />
+        
+      <KpiCard label={t('kpi_totalUsers')} value={totalUsers} icon="👥" onClick={() => setPage('users')} />
+<KpiCard label={t('kpi_activeUsers')} value={activeUsers} icon="✅" accent="#16A34A" />
+<KpiCard label={t('kpi_sectors')} value={sectorCount} icon="🏢" accent="#7C3AED" onClick={() => setPage('sectors')} />
+<KpiCard label={t('kpi_directorates')} value={directorateCount} icon="🏛" accent="#2563EB" onClick={() => setPage('directorates')} />
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
@@ -111,50 +135,78 @@ export default function AdminPage({ page, setPage }: Props) {
               {t('viewAll')}
             </button>
           </div>
-
           <div className="divide-y divide-gray-50">
-            {AUDIT_LOGS.slice(0, 6).map(log => (
-              <div
-                key={log.id}
-                className="flex items-center gap-4 px-6 py-3.5 hover:bg-gray-50 transition-colors"
-              >
-                <div
-                  className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm flex-shrink-0 ${
-                    log.type === 'user'
-                      ? 'bg-blue-50'
-                      : log.type === 'case'
-                        ? 'bg-green-50'
-                        : log.type === 'org'
-                          ? 'bg-purple-50'
-                          : 'bg-amber-50'
-                  }`}
-                >
-                  {log.type === 'user'
-                    ? '👤'
-                    : log.type === 'case'
-                      ? '📋'
-                      : log.type === 'org'
-                        ? '🏢'
-                        : '🔄'}
-                </div>
-
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-gray-800">
-                    {log.action}
-                  </p>
-
-                  <p className="text-xs text-gray-400 truncate">
-                    {log.entity} · {log.user}
+              {auditLoading ? (
+                <div className="px-6 py-8 text-center">
+                  <p className="text-sm text-gray-500">
+                    Loading recent activity...
                   </p>
                 </div>
+              ) : recentAuditLogs.length === 0 ? (
+                <div className="px-6 py-8 text-center">
+                  <p className="text-sm text-gray-500">
+                    No recent system activity.
+                  </p>
+                </div>
+              ) : (
+                recentAuditLogs.map(log => (
+                  <div
+                    key={log.auditLogId}
+                    className="flex items-center gap-4 px-6 py-3.5 hover:bg-gray-50 transition-colors"
+                  >
+                    {/* Icon */}
+                    <div
+                      className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm flex-shrink-0 ${
+                        log.entityType === 'USER'
+                          ? 'bg-blue-50'
+                          : log.entityType === 'CASE'
+                            ? 'bg-green-50'
+                            : log.entityType ===
+                                'ORGANIZATIONAL_UNIT'
+                              ? 'bg-purple-50'
+                              : 'bg-amber-50'
+                      }`}
+                    >
+                      {log.entityType === 'USER'
+                        ? '👤'
+                        : log.entityType === 'CASE'
+                          ? '📋'
+                          : log.entityType ===
+                              'ORGANIZATIONAL_UNIT'
+                            ? '🏢'
+                            : '🔄'}
+                    </div>
 
-                <span className="text-xs text-gray-400 whitespace-nowrap">
-                  {log.timestamp}
-                </span>
-              </div>
-            ))}
+                    {/* Activity */}
+                    <div className="flex-1 min-w-0"> 
+                      <p className="text-sm font-medium text-gray-800"> 
+                        {formatAuditAction(log.action)}
+                        {getActivityDetail(log) && (
+                          <span className="text-gray-500 font-normal"> — {getActivityDetail(log)}</span>
+                        )}
+                      </p> 
+
+                      <p className="text-xs text-gray-400 truncate"> 
+                        {(() => {
+                          const values = log.newValues ?? log.oldValues
+                          const parentName = getParentName(orgUnits, values?.parentUnitId as string | undefined)
+                          return parentName
+                            ? `Under ${parentName} · ${log.user.name}`
+                            : `${formatAuditAction(log.entityType)} · ${log.user.name}`
+                        })()}
+                      </p> 
+                    </div>
+
+                    {/* Timestamp */}
+                    <span className="text-xs text-gray-400 whitespace-nowrap">
+                      {formatDate(log.createdAt)}
+                    </span>
+                  </div>
+                ))
+              )}
+            </div>
+
           </div>
-        </div>
 
         {/* System status */}
         <div className="space-y-4">
@@ -272,6 +324,22 @@ function DetailRow({
   )
 }
 
+function getActivityDetail(log: AuditLog) {
+  const values = log.newValues ?? log.oldValues
+  if (!values) return null
+
+  const name = values.name as string | undefined
+  const unitType = values.unitType as string | undefined
+
+  if (!name) return null
+
+  return unitType ? `${name} (${unitType})` : name
+}
+
+function getParentName(orgUnits: OrganizationUnit[], parentUnitId: string | null | undefined) {
+  if (!parentUnitId) return null
+  return orgUnits.find(u => u.unitId === parentUnitId)?.name ?? null
+}
 // ───────────────────────────────────────────────────────
 // Users Page
 // ───────────────────────────────────────────────────────
@@ -368,12 +436,9 @@ function UsersPage() {
         .toLowerCase()
         .includes(search.toLowerCase())
 
-    const matchesRole =
-      selectedRole === '' ||
-      user.roles.some(
-        userRole =>
-          userRole.role.name === selectedRole
-      )
+        const matchesRole =
+        selectedRole === '' ||
+        user.role?.name === selectedRole
 
     return matchesSearch && matchesRole
   })
@@ -785,7 +850,7 @@ function UserDetailsModal({
     setUnitId(currentUser.unit?.unitId ?? '')
     setError('')
   }
-  
+
   function formatDate(
     value: string | null
   ) {
@@ -1026,8 +1091,7 @@ function UserDetailsModal({
               </p>
 
               <p className="text-sm text-gray-800 mt-1">
-                {user.unit?.parentUnitId ||
-                  'None — Top Level'}
+              {user.unit?.parent?.name ?? 'None — Top Level'}
               </p>
             </div>
 
@@ -1061,37 +1125,23 @@ function UserDetailsModal({
           </SectionTitle>
 
           <div className="border border-gray-100 rounded-xl p-4">
-            {user.roles.length === 0 ? (
+            {!user.role ? (
               <p className="text-sm text-gray-500">
-                No roles assigned.
+                No role assigned.
               </p>
             ) : (
-              <div className="space-y-3">
-                {user.roles.map(
-                  (userRole: UserRole) => (
-                                    <div
-                      key={userRole.roleId}
-                      className="bg-gray-50 rounded-lg p-3"
-                    >
-                      <div className="flex items-center justify-between gap-3">
-                        <span className="text-sm font-semibold text-gray-800">
-                          {userRole.role.name}
-                        </span>
+              <div className="bg-gray-50 rounded-lg p-3">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-sm font-semibold text-gray-800">
+                    {user.role.name}
+                  </span>
 
-                        <RoleBadge
-                          role={userRole.role.name}
-                        />
-                      </div>
+                  <RoleBadge role={user.role.name} />
+                </div>
 
-                      <p className="text-xs text-gray-500 mt-1">
-                        {
-                          userRole.role
-                            .description
-                        }
-                      </p>
-                    </div>
-                  )
-                )}
+                <p className="text-xs text-gray-500 mt-1">
+                  {user.role.description}
+                </p>
               </div>
             )}
           </div>
@@ -1706,8 +1756,8 @@ function OrgPage({ tab }: { tab: string }) {
         )}
 
       {/* Tree view */}
-      {!loading &&
-        organizations.length > 0 && (
+      {!loading && tab === 'org' &&
+      organizations.length > 0 && (
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
             <div className="space-y-4">
               {sectors.map(s => (
@@ -1835,6 +1885,96 @@ function OrgPage({ tab }: { tab: string }) {
             </div>
           </div>
         )}
+
+
+        {/* Sectors-only view */}
+            {!loading && tab === 'sectors' && (
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 divide-y divide-gray-50">
+                {sectors.length === 0 ? (
+                  <div className="p-10 text-center text-sm text-gray-500">No sectors yet.</div>
+                ) : (
+                  sectors.map(s => (
+                    <div
+                      key={s.unitId}
+                      onClick={() => handleUnitClick(s.unitId)}
+                      className="px-5 py-4 flex items-center justify-between cursor-pointer hover:bg-gray-50 transition-colors"
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="text-base">🏢</span>
+                        <span className="text-sm font-bold text-gray-900">{s.name}</span>
+                      </div>
+                      <span className={`text-xs font-semibold px-2 py-1 rounded-full ${s.isActive ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                        {s.isActive ? 'Active' : 'Inactive'}
+                      </span>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+
+            {/* Directorates-only view */}
+            {!loading && tab === 'directorates' && (
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 divide-y divide-gray-50">
+                {dirs.length === 0 ? (
+                  <div className="p-10 text-center text-sm text-gray-500">No directorates yet.</div>
+                ) : (
+                  dirs.map(d => {
+                    const parentSector = sectors.find(s => s.unitId === d.parentUnitId)
+                    return (
+                      <div
+                        key={d.unitId}
+                        onClick={() => handleUnitClick(d.unitId)}
+                        className="px-5 py-4 flex items-center justify-between cursor-pointer hover:bg-gray-50 transition-colors"
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="text-base">🏛</span>
+                          <div>
+                            <span className="text-sm font-semibold text-gray-900">{d.name}</span>
+                            <p className="text-xs text-gray-400">{parentSector?.name ?? 'No parent sector'}</p>
+                          </div>
+                        </div>
+                        <span className={`text-xs font-semibold px-2 py-1 rounded-full ${d.isActive ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                          {d.isActive ? 'Active' : 'Inactive'}
+                        </span>
+                      </div>
+                    )
+                  })
+                )}
+              </div>
+            )}
+
+            {/* Groups-only view */}
+            {!loading && tab === 'groups' && (
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 divide-y divide-gray-50">
+                {groups.length === 0 ? (
+                  <div className="p-10 text-center text-sm text-gray-500">No groups yet.</div>
+                ) : (
+                  groups.map(g => {
+                    const parentDir = dirs.find(d => d.unitId === g.parentUnitId)
+                    return (
+                      <div
+                        key={g.unitId}
+                        onClick={() => handleUnitClick(g.unitId)}
+                        className="px-5 py-4 flex items-center justify-between cursor-pointer hover:bg-gray-50 transition-colors"
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="text-base">👥</span>
+                          <div>
+                            <span className="text-sm font-semibold text-gray-900">{g.name}</span>
+                            <p className="text-xs text-gray-400">{parentDir?.name ?? 'No parent directorate'}</p>
+                          </div>
+                        </div>
+                        <span className={`text-xs font-semibold px-2 py-1 rounded-full ${g.isActive ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                          {g.isActive ? 'Active' : 'Inactive'}
+                        </span>
+                      </div>
+                    )
+                  })
+                )}
+              </div>
+            )}
+
+
 
       {/* Create Organization Modal */}
       <Modal
@@ -2265,36 +2405,95 @@ function OrganizationDetailsModal({
     </Modal>
   )
 }
-
+//---------------------------
+//audit fun
+//------------------------------
+function formatAuditAction(action: string) {
+  return action
+    .toLowerCase()
+    .split('_')
+    .map(word =>
+      word.charAt(0).toUpperCase() + word.slice(1)
+    )
+    .join(' ')
+}
 // ───────────────────────────────────────────────────────
 // Audit Logs
 // ───────────────────────────────────────────────────────
 
 function AuditPage() {
+  const [auditLogs, setAuditLogs] = useState<AuditLog[]>([])
   const [search, setSearch] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
 
-  const filtered = AUDIT_LOGS.filter(
-    l =>
-      l.action
+  useEffect(() => {
+    async function loadAuditLogs() {
+      try {
+        setLoading(true)
+        setError('')
+
+        const result = await getAuditLogs()
+
+        setAuditLogs(result.data ?? [])
+      } catch (error: any) {
+        console.error(
+          'Failed to load audit logs:',
+          error
+        )
+
+        setError(
+          error.response?.data?.message ||
+            'Failed to load audit logs.'
+        )
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    loadAuditLogs()
+  }, [])
+
+  const filtered = auditLogs.filter(log => {
+    const searchTerm = search.toLowerCase()
+
+    return (
+      log.action
         .toLowerCase()
-        .includes(search.toLowerCase()) ||
-      l.user
+        .includes(searchTerm) ||
+      log.entityType
         .toLowerCase()
-        .includes(search.toLowerCase()) ||
-      l.entity
+        .includes(searchTerm) ||
+      log.entityId
         .toLowerCase()
-        .includes(search.toLowerCase())
-  )
+        .includes(searchTerm) ||
+      log.user.name
+        .toLowerCase()
+        .includes(searchTerm) ||
+      log.user.email
+        .toLowerCase()
+        .includes(searchTerm)
+    )
+  })
 
   return (
     <div className="p-6 space-y-4">
+      {/* Header */}
       <div className="flex items-center justify-between">
-        <h2
-          className="text-xl font-black text-gray-900"
-          style={{ fontFamily: 'var(--font-display)' }}
-        >
-          Audit Logs
-        </h2>
+        <div>
+          <h2
+            className="text-xl font-black text-gray-900"
+            style={{
+              fontFamily: 'var(--font-display)',
+            }}
+          >
+            Audit Logs
+          </h2>
+
+          <p className="text-sm text-gray-500 mt-1">
+            Monitor system activity and important changes.
+          </p>
+        </div>
 
         <input
           type="text"
@@ -2307,75 +2506,113 @@ function AuditPage() {
         />
       </div>
 
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-gray-100">
-                {[
-                  'Timestamp',
-                  'User',
-                  'Action',
-                  'Entity',
-                  'Type',
-                ].map(h => (
-                  <th
-                    key={h}
-                    className="text-left px-5 py-3 text-xs font-bold text-gray-400 uppercase tracking-wide"
-                  >
-                    {h}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-
-            <tbody>
-              {filtered.map(log => (
-                <tr
-                  key={log.id}
-                  className="border-b border-gray-50 hover:bg-gray-50 transition-colors"
-                >
-                  <td className="px-5 py-3 text-xs font-mono text-gray-500">
-                    {log.timestamp}
-                  </td>
-
-                  <td className="px-5 py-3 text-sm font-medium text-gray-800">
-                    {log.user}
-                  </td>
-
-                  <td className="px-5 py-3 text-sm text-gray-700">
-                    {log.action}
-                  </td>
-
-                  <td className="px-5 py-3 text-xs text-gray-500 max-w-[200px] truncate">
-                    {log.entity}
-                  </td>
-
-                  <td className="px-5 py-3">
-                    <span
-                      className={`text-xs font-semibold px-2 py-1 rounded-full ${
-                        log.type === 'user'
-                          ? 'bg-blue-50 text-blue-700'
-                          : log.type === 'case'
-                            ? 'bg-green-50 text-green-700'
-                            : log.type === 'org'
-                              ? 'bg-purple-50 text-purple-700'
-                              : 'bg-amber-50 text-amber-700'
-                      }`}
-                    >
-                      {log.type}
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      {/* Error */}
+      {error && (
+        <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-sm">
+          {error}
         </div>
-      </div>
+      )}
+
+      {/* Loading */}
+      {loading && (
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-10 text-center">
+          <p className="text-sm text-gray-500">
+            Loading audit logs...
+          </p>
+        </div>
+      )}
+
+      {/* Empty */}
+      {!loading &&
+        !error &&
+        filtered.length === 0 && (
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-10 text-center">
+            <div className="text-4xl mb-3">
+              📋
+            </div>
+
+            <h3 className="font-bold text-gray-900">
+              No audit logs found
+            </h3>
+
+            <p className="text-sm text-gray-500 mt-1">
+              {search
+                ? 'Try a different search term.'
+                : 'There is no recorded system activity yet.'}
+            </p>
+          </div>
+        )}
+
+      {/* Audit table */}
+      {!loading &&
+        filtered.length > 0 && (
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-gray-100">
+                  {['Timestamp', 'User', 'Activity', 'Entity'].map(h => (
+                    <th
+                      key={h}
+                      className="text-left px-5 py-3 text-xs font-bold text-gray-400 uppercase tracking-wide"
+                    >
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+
+                  <tbody>
+                    {filtered.map(log => (
+                      <tr key={log.auditLogId} className="border-b border-gray-50">
+                        {/* Timestamp */}
+                        <td className="px-5 py-3 text-xs font-mono text-gray-500 whitespace-nowrap align-top">
+                          {formatDate(log.createdAt)}
+                        </td>
+
+                        {/* User */}
+                        <td className="px-5 py-3 align-top">
+                          <p className="text-sm font-medium text-gray-800">{log.user.name}</p>
+                          <p className="text-xs text-gray-400">{log.user.email}</p>
+                        </td>
+
+                        {/* Activity — action + detail, this is now the wide column */}
+                        <td className="px-5 py-3 text-sm text-gray-700 align-top">
+                          {formatAuditAction(log.action)}
+                          {getActivityDetail(log) && (
+                            <span className="text-gray-400"> — {getActivityDetail(log)}</span>
+                          )}
+                        </td>
+
+                        {/* Entity — type badge + short id, combined */}
+                        <td className="px-5 py-3 align-top">
+                          <span
+                            className={`text-xs font-semibold px-2 py-1 rounded-full whitespace-nowrap ${
+                              log.entityType === 'USER'
+                                ? 'bg-blue-50 text-blue-700'
+                                : log.entityType === 'CASE'
+                                  ? 'bg-green-50 text-green-700'
+                                  : log.entityType === 'ORGANIZATIONAL_UNIT'
+                                    ? 'bg-purple-50 text-purple-700'
+                                    : 'bg-amber-50 text-amber-700'
+                            }`}
+                          >
+                            {formatAuditAction(log.entityType)}
+                          </span>
+                          <p className="font-mono text-xs text-gray-400 mt-1" title={log.entityId}>
+                            {log.entityId.slice(0, 8)}…
+                          </p>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+              </table>
+            </div>
+          </div>
+        )}
     </div>
   )
 }
-
 // ───────────────────────────────────────────────────────
 // Roles & Permissions
 // ───────────────────────────────────────────────────────

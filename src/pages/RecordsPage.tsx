@@ -1,6 +1,31 @@
-import { useState } from 'react'
-import { CASES, SECTORS } from '../data'
-import { StatusBadge, KpiCard, Btn, Modal, Input, Textarea, Select, TabBar, CaseTimeline, EmptyState, PriorityBadge } from '../components/ui'
+import { useState, useEffect } from 'react'
+import { getCases, type CaseItem } from '../api/cases.api'
+
+
+import { assignCase } from '../api/workflow.api'
+import {
+  createCase,
+  uploadDocument,
+  uploadAttachment,
+} from '../api/cases.api'
+
+import { getOrganizations, type OrganizationUnit } from '../api/organizations.api'
+
+
+import {
+  StatusBadge,
+  KpiCard,
+  Btn,
+  Modal,
+  Input,
+  Textarea,
+  Select,
+  TabBar,
+  CaseTimeline,
+  EmptyState,
+  PriorityBadge,
+} from '../components/ui'
+
 import type { CaseRecord } from '../types'
 import { useLanguage } from '../i18n'
 
@@ -9,11 +34,72 @@ interface Props {
   setPage: (p: string) => void
 }
 
+function formatCaseStatus(status: string): CaseRecord['status'] {
+  const map: Record<string, CaseRecord['status']> = {
+    SUBMITTED: 'Submitted',
+    UNDER_REVIEW: 'In Progress',
+    IN_PROGRESS: 'In Progress',
+    PENDING_CLARIFICATION: 'Pending Clarification',
+    SENT_BACK_FOR_CORRECTION: 'Returned',
+    APPROVED: 'Approved',
+    REJECTED: 'Rejected',
+    COMPLETED: 'Approved',
+    ARCHIVED: 'Archived',
+  }
+  return map[status] ?? 'Submitted'
+}
+
+function mapCaseToRecord(c: CaseItem): CaseRecord {
+  return {
+    id: c.trackingNumber,
+    subject: c.subject,
+    customer: c.customer?.name ?? '',
+    customerPhone: c.customer?.phone ?? '',
+    customerEmail: c.customer?.email ?? '',
+    customerAddress: c.customer?.address ?? '',
+    sector: c.currentUnit?.name ?? 'Unassigned',
+    directorate: '',
+    group: '',
+    status: formatCaseStatus(c.status),
+    priority: 'Normal',
+    date: new Date(c.submittedAt).toLocaleDateString(),
+    lastActivity: new Date(c.updatedAt).toLocaleDateString(),
+    reference: c.incomingReferenceNo ?? '',
+    documents: [],
+    timeline: [],
+    remarks: [],
+  }
+}
+
 export default function RecordsPage({ page, setPage }: Props) {
   const { t } = useLanguage()
-  const [selectedCase, setSelectedCase] = useState<CaseRecord | null>(null)
+
+  const [selectedCase, setSelectedCase] =
+    useState<CaseRecord | null>(null)
+
   const [caseTab, setCaseTab] = useState('Overview')
   const [searchQ, setSearchQ] = useState('')
+
+  const [cases, setCases] = useState<CaseItem[]>([])
+const [loadingCases, setLoadingCases] = useState(true)
+const [casesError, setCasesError] = useState('')
+
+useEffect(() => {
+  async function loadCases() {
+    try {
+      setLoadingCases(true)
+      setCasesError('')
+      const result = await getCases()
+      setCases(result.data ?? [])
+    } catch (err: any) {
+      console.error('Failed to load cases:', err)
+      setCasesError(err.response?.data?.message || 'Failed to load cases.')
+    } finally {
+      setLoadingCases(false)
+    }
+  }
+  loadCases()
+}, [])
 
   function openCase(c: CaseRecord) {
     setSelectedCase(c)
@@ -21,29 +107,81 @@ export default function RecordsPage({ page, setPage }: Props) {
     setCaseTab('Overview')
   }
 
-  if (page === 'register') return <RegisterCaseForm onSuccess={() => setPage('cases')} />
-  if (page === 'case-detail' && selectedCase) return (
-    <CaseDetail c={selectedCase} tab={caseTab} setTab={setCaseTab} onBack={() => setPage('cases')} role="records" />
+  if (page === 'register') {
+    return <RegisterCaseForm onSuccess={() => setPage('cases')} />
+  }
+
+  if (page === 'case-detail' && selectedCase) {
+    return (
+      <CaseDetail
+        c={selectedCase}
+        tab={caseTab}
+        setTab={setCaseTab}
+        onBack={() => setPage('cases')}
+        role="records"
+      />
+    )
+  }
+
+  const myCases = cases.map(mapCaseToRecord).filter(
+    c =>
+      (
+        page === 'archived'
+          ? c.status === 'Archived'
+          : page === 'registered'
+            ? true
+            : true
+      ) &&
+      (
+        c.subject.toLowerCase().includes(searchQ.toLowerCase()) ||
+        c.id.toLowerCase().includes(searchQ.toLowerCase()) ||
+        c.customer.toLowerCase().includes(searchQ.toLowerCase())
+      )
   )
 
-  const myCases = CASES.filter(c =>
-    (page === 'archived' ? c.status === 'Archived' : page === 'registered' ? true : true) &&
-    (c.subject.toLowerCase().includes(searchQ.toLowerCase()) || c.id.toLowerCase().includes(searchQ.toLowerCase()) || c.customer.toLowerCase().includes(searchQ.toLowerCase()))
-  )
+  // ─────────────────────────────────────────────
+  // Documents
+  // ─────────────────────────────────────────────
 
   if (page === 'documents') {
     return (
       <div className="p-6">
-        <h2 className="text-xl font-black text-gray-900 mb-6" style={{ fontFamily: 'var(--font-display)' }}>{t('documents')}</h2>
+        <h2
+          className="text-xl font-black text-gray-900 mb-6"
+          style={{ fontFamily: 'var(--font-display)' }}
+        >
+          {t('documents')}
+        </h2>
+
         <div className="grid gap-4">
-          {CASES.flatMap(c => c.documents.map(d => ({ ...d, caseId: c.id, subject: c.subject }))).map((d, i) => (
-            <div key={i} className="bg-white rounded-xl border border-gray-100 p-4 flex items-center gap-4 shadow-sm">
-              <div className="w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center text-xl">📄</div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-gray-900 truncate">{d.name}</p>
-                <p className="text-xs text-gray-400">Version {d.version} · {d.size} · {d.date} · {d.caseId}</p>
+        {cases.map(mapCaseToRecord).flatMap(c =>
+            c.documents.map(d => ({
+              ...d,
+              caseId: c.id,
+              subject: c.subject,
+            }))
+          ).map((d, i) => (
+            <div
+              key={i}
+              className="bg-white rounded-xl border border-gray-100 p-4 flex items-center gap-4 shadow-sm"
+            >
+              <div className="w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center text-xl">
+                📄
               </div>
-              <Btn variant="secondary" size="sm">View</Btn>
+
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-gray-900 truncate">
+                  {d.name}
+                </p>
+
+                <p className="text-xs text-gray-400">
+                  Version {d.version} · {d.size} · {d.date} · {d.caseId}
+                </p>
+              </div>
+
+              <Btn variant="secondary" size="sm">
+                View
+              </Btn>
             </div>
           ))}
         </div>
@@ -51,58 +189,149 @@ export default function RecordsPage({ page, setPage }: Props) {
     )
   }
 
+  // ─────────────────────────────────────────────
+  // Archive
+  // ─────────────────────────────────────────────
+
   if (page === 'archive') {
-    const archived = CASES.filter(c => c.status === 'Archived' || c.status === 'Approved' || c.status === 'Rejected')
+    const archivedCases = cases.map(mapCaseToRecord).filter(
+      c =>
+        c.status === 'Archived' ||
+        c.status === 'Approved' ||
+        c.status === 'Rejected'
+    )
+
     return (
       <div className="p-6">
-        <h2 className="text-xl font-black text-gray-900 mb-6" style={{ fontFamily: 'var(--font-display)' }}>{t('archive')}</h2>
-        <CasesTable cases={archived} onOpen={openCase} />
+        <h2
+          className="text-xl font-black text-gray-900 mb-6"
+          style={{ fontFamily: 'var(--font-display)' }}
+        >
+          {t('archive')}
+        </h2>
+
+        <CasesTable
+          cases={archivedCases}
+          onOpen={openCase}
+        />
       </div>
     )
   }
 
+  // ─────────────────────────────────────────────
+  // Dashboard
+  // ─────────────────────────────────────────────
+
   if (page === 'dashboard') {
     return (
       <div className="p-6 space-y-6">
+
         {/* Welcome */}
         <div className="bg-gradient-to-r from-[#1E4B8F] to-[#2558A8] rounded-2xl p-6 text-white flex items-center justify-between">
           <div>
-            <p className="text-blue-200 text-sm font-semibold mb-1">{t('goodMorning')}, Sara</p>
-            <h1 className="text-2xl font-black" style={{ fontFamily: 'var(--font-display)' }}>{t('recordsDashboard')}</h1>
-            <p className="text-blue-200 text-sm mt-1">{t('todayIs')}</p>
+            <p className="text-blue-200 text-sm font-semibold mb-1">
+              {t('goodMorning')}, Sara
+            </p>
+
+            <h1
+              className="text-2xl font-black"
+              style={{ fontFamily: 'var(--font-display)' }}
+            >
+              {t('recordsDashboard')}
+            </h1>
+
+            <p className="text-blue-200 text-sm mt-1">
+              {t('todayIs')}
+            </p>
           </div>
-          <Btn onClick={() => setPage('register')} variant="secondary" size="lg" className="bg-white text-[#1E4B8F] border-0 font-black shadow-lg">
+
+          <Btn
+            onClick={() => setPage('register')}
+            variant="secondary"
+            size="lg"
+            className="bg-white text-[#1E4B8F] border-0 font-black shadow-lg"
+          >
             ➕ Register New Case
           </Btn>
         </div>
 
         {/* KPIs */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <KpiCard label={t('kpi_registeredToday')} value={5} icon="📋" sub="Aug 15, 2026" />
-          <KpiCard label={t('kpi_totalActive')} value={18} icon="🔄" accent="#2563EB" />
-          <KpiCard label={t('kpi_archivedCases')} value={2} icon="🗃" accent="#6B7280" />
-          <KpiCard label={t('kpi_pendingUpload')} value={3} icon="⚠️" accent="#D97706" />
+          <KpiCard
+            label={t('kpi_registeredToday')}
+            value={5}
+            icon="📋"
+            sub="Aug 15, 2026"
+          />
+
+          <KpiCard
+            label={t('kpi_totalActive')}
+            value={18}
+            icon="🔄"
+            accent="#2563EB"
+          />
+
+          <KpiCard
+            label={t('kpi_archivedCases')}
+            value={2}
+            icon="🗃"
+            accent="#6B7280"
+          />
+
+          <KpiCard
+            label={t('kpi_pendingUpload')}
+            value={3}
+            icon="⚠️"
+            accent="#D97706"
+          />
         </div>
 
         {/* Recent cases */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100">
           <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
-            <h2 className="text-base font-bold text-gray-900" style={{ fontFamily: 'var(--font-display)' }}>{t('recentlyRegistered')}</h2>
-            <button onClick={() => setPage('cases')} className="text-xs text-[#1E4B8F] font-semibold hover:underline">{t('viewAll')}</button>
+            <h2
+              className="text-base font-bold text-gray-900"
+              style={{ fontFamily: 'var(--font-display)' }}
+            >
+              {t('recentlyRegistered')}
+            </h2>
+
+            <button
+              onClick={() => setPage('cases')}
+              className="text-xs text-[#1E4B8F] font-semibold hover:underline"
+            >
+              {t('viewAll')}
+            </button>
           </div>
-          <CasesTable cases={CASES.slice(0, 5)} onOpen={openCase} />
+
+          <CasesTable
+            cases={cases.map(mapCaseToRecord).slice(0, 5)}
+            onOpen={openCase}
+          />
         </div>
       </div>
     )
   }
 
+  // ─────────────────────────────────────────────
   // Cases list
+  // ─────────────────────────────────────────────
+
   return (
     <div className="p-6 space-y-4">
+
       <div className="flex items-center justify-between">
-        <h2 className="text-xl font-black text-gray-900" style={{ fontFamily: 'var(--font-display)' }}>
-          {page === 'archived' ? t('archivedCases') : page === 'registered' ? t('registeredCases') : t('allCases')}
+        <h2
+          className="text-xl font-black text-gray-900"
+          style={{ fontFamily: 'var(--font-display)' }}
+        >
+          {page === 'archived'
+            ? t('archivedCases')
+            : page === 'registered'
+              ? t('registeredCases')
+              : t('allCases')}
         </h2>
+
         <div className="flex gap-3">
           <input
             type="text"
@@ -111,42 +340,110 @@ export default function RecordsPage({ page, setPage }: Props) {
             placeholder="Search…"
             className="px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#1E4B8F]/20"
           />
-          <Btn onClick={() => setPage('register')}>➕ {t('registerCase')}</Btn>
+
+          <Btn onClick={() => setPage('register')}>
+            ➕ {t('registerCase')}
+          </Btn>
         </div>
       </div>
+
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100">
-        <CasesTable cases={myCases} onOpen={openCase} />
+        <CasesTable
+          cases={myCases}
+          onOpen={openCase}
+        />
       </div>
     </div>
   )
 }
 
-// ── Cases Table ────────────────────────────────────────
-function CasesTable({ cases, onOpen }: { cases: CaseRecord[]; onOpen: (c: CaseRecord) => void }) {
+// ─────────────────────────────────────────────────────
+// Cases Table
+// ─────────────────────────────────────────────────────
+
+function CasesTable({
+  cases,
+  onOpen,
+}: {
+  cases: CaseRecord[]
+  onOpen: (c: CaseRecord) => void
+}) {
   const { t } = useLanguage()
-  if (!cases.length) return <EmptyState icon="📁" title={t('empty_noCases')} sub={t('empty_noCasesDesc')} />
+
+  if (!cases.length) {
+    return (
+      <EmptyState
+        icon="📁"
+        title={t('empty_noCases')}
+        sub={t('empty_noCasesDesc')}
+      />
+    )
+  }
+
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-gray-100">
-            {[t('col_trackingNo'), t('col_subject'), t('col_customer'), t('col_sector'), t('col_status'), t('col_priority'), t('col_date'), ''].map(h => (
-              <th key={h} className="text-left px-5 py-3 text-xs font-bold text-gray-400 uppercase tracking-wide whitespace-nowrap">{h}</th>
+            {[
+              t('col_trackingNo'),
+              t('col_subject'),
+              t('col_customer'),
+              t('col_sector'),
+              t('col_status'),
+              t('col_priority'),
+              t('col_date'),
+              '',
+            ].map(h => (
+              <th
+                key={h}
+                className="text-left px-5 py-3 text-xs font-bold text-gray-400 uppercase tracking-wide whitespace-nowrap"
+              >
+                {h}
+              </th>
             ))}
           </tr>
         </thead>
+
         <tbody>
           {cases.map(c => (
-            <tr key={c.id} onClick={() => onOpen(c)} className="border-b border-gray-50 hover:bg-gray-50 cursor-pointer transition-colors">
-              <td className="px-5 py-3.5 font-mono font-semibold text-[#1E4B8F] text-xs">{c.id}</td>
-              <td className="px-5 py-3.5 font-medium text-gray-900 max-w-[180px] truncate">{c.subject}</td>
-              <td className="px-5 py-3.5 text-gray-600">{c.customer}</td>
-              <td className="px-5 py-3.5 text-gray-500 text-xs">{c.sector}</td>
-              <td className="px-5 py-3.5"><StatusBadge status={c.status} /></td>
-              <td className="px-5 py-3.5"><PriorityBadge priority={c.priority} /></td>
-              <td className="px-5 py-3.5 text-gray-400 text-xs whitespace-nowrap">{c.date}</td>
+            <tr
+              key={c.id}
+              onClick={() => onOpen(c)}
+              className="border-b border-gray-50 hover:bg-gray-50 cursor-pointer transition-colors"
+            >
+              <td className="px-5 py-3.5 font-mono font-semibold text-[#1E4B8F] text-xs">
+                {c.id}
+              </td>
+
+              <td className="px-5 py-3.5 font-medium text-gray-900 max-w-[180px] truncate">
+                {c.subject}
+              </td>
+
+              <td className="px-5 py-3.5 text-gray-600">
+                {c.customer}
+              </td>
+
+              <td className="px-5 py-3.5 text-gray-500 text-xs">
+                {c.sector}
+              </td>
+
               <td className="px-5 py-3.5">
-                <button className="text-xs text-[#1E4B8F] font-semibold hover:underline">{t('view')}</button>
+                <StatusBadge status={c.status} />
+              </td>
+
+              <td className="px-5 py-3.5">
+                <PriorityBadge priority={c.priority} />
+              </td>
+
+              <td className="px-5 py-3.5 text-gray-400 text-xs whitespace-nowrap">
+                {c.date}
+              </td>
+
+              <td className="px-5 py-3.5">
+                <button className="text-xs text-[#1E4B8F] font-semibold hover:underline">
+                  {t('view')}
+                </button>
               </td>
             </tr>
           ))}
@@ -156,371 +453,1747 @@ function CasesTable({ cases, onOpen }: { cases: CaseRecord[]; onOpen: (c: CaseRe
   )
 }
 
-// ── Register Case Form ─────────────────────────────────
-function RegisterCaseForm({ onSuccess }: { onSuccess: () => void }) {
-  const { t } = useLanguage()
-  const [step, setStep] = useState<1 | 2 | 3 | 'done'>(1)
-  const [sector, setSector] = useState('')
-  const [formData, setFormData] = useState({ name: '', phone: '', email: '', address: '', subject: '', reference: '', priority: 'Normal', notes: '' })
-  const generatedId = 'FHC-2026-' + String(CASES.length + 1).padStart(3, '0')
+// ─────────────────────────────────────────────────────
+// Register Case Form
+// ─────────────────────────────────────────────────────
 
-  function update(k: string, v: string) { setFormData(f => ({ ...f, [k]: v })) }
+function RegisterCaseForm({
+  onSuccess,
+}: {
+  onSuccess: () => void
+}) {
+  const { t } = useLanguage()
+
+  const [step, setStep] = useState<1 | 2 | 3 | 'done'>(1)
+
+  const [sector, setSector] = useState('')
+
+  
+  // ── NEW: live sectors from the backend ──
+  const [sectors, setSectors] = useState<OrganizationUnit[]>([])
+  const [loadingSectors, setLoadingSectors] = useState(false)
+  const [sectorsError, setSectorsError] = useState('')
+
+  useEffect(() => {
+    async function loadSectors() {
+      try {
+        setLoadingSectors(true)
+        setSectorsError('')
+
+        const result = await getOrganizations({
+          unitType: 'SECTOR',
+          isActive: true,
+        })
+
+        setSectors(result.data ?? [])
+      } catch (err: any) {
+        console.error('Failed to load sectors:', err)
+        setSectorsError(
+          err.response?.data?.message || 'Failed to load sectors.'
+        )
+      } finally {
+        setLoadingSectors(false)
+      }
+    }
+
+    loadSectors()
+  }, [])
+
+
+  // The state stores the ORGANIZATIONAL UNIT ID.
+  // Never change this to the sector name.
+ 
+  const [mainDocument, setMainDocument] =
+    useState<File | null>(null)
+
+  const [attachments, setAttachments] =
+    useState<File[]>([])
+
+  const [documentType, setDocumentType] =
+    useState('Application Form')
+
+  const [documentTitle, setDocumentTitle] =
+    useState('')
+
+  const [isSubmitting, setIsSubmitting] =
+    useState(false)
+
+  const [error, setError] =
+    useState('')
+
+  const [registrationResult, setRegistrationResult] =
+    useState<{
+      caseId: string
+      documentId: string
+      trackingNumber: string
+    } | null>(null)
+
+  const [formData, setFormData] = useState({
+    name: '',
+    phone: '',
+    email: '',
+    address: '',
+    subject: '',
+    reference: '',
+    priority: 'Normal',
+    notes: '',
+  })
+
+  // Convert sector ID → sector object.
+  // This is only for DISPLAY.
+  const selectedSector = sectors.find(s => s.unitId === sector)
+
+  function update(k: string, v: string) {
+    setFormData(f => ({
+      ...f,
+      [k]: v,
+    }))
+  }
+
+  // ─────────────────────────────────────────────
+  // Reset form
+  // ─────────────────────────────────────────────
+
+  function resetForm() {
+    setStep(1)
+
+    setSector('')
+
+    setMainDocument(null)
+
+    setAttachments([])
+
+    setDocumentType('Application Form')
+
+    setDocumentTitle('')
+
+    setError('')
+
+    setRegistrationResult(null)
+
+    setFormData({
+      name: '',
+      phone: '',
+      email: '',
+      address: '',
+      subject: '',
+      reference: '',
+      priority: 'Normal',
+      notes: '',
+    })
+  }
+
+  // ─────────────────────────────────────────────
+  // Register case
+  // ─────────────────────────────────────────────
+
+  async function handleRegisterCase() {
+    setError('')
+
+    if (!formData.name.trim()) {
+      setError('Please enter the customer name.')
+      setStep(1)
+      return
+    }
+
+    if (!formData.phone.trim()) {
+      setError('Please enter the customer phone number.')
+      setStep(1)
+      return
+    }
+
+    if (!formData.subject.trim()) {
+      setError('Please enter the case subject.')
+      setStep(2)
+      return
+    }
+
+    if (!formData.reference.trim()) {
+      setError('Please enter the incoming reference number.')
+      setStep(2)
+      return
+    }
+
+    if (!mainDocument) {
+      setError('Please upload the main document.')
+      return
+    }
+
+    if (!documentTitle.trim()) {
+      setError('Please enter the document title.')
+      return
+    }
+
+    if (!documentType.trim()) {
+      setError('Please select a document type.')
+      return
+    }
+
+    if (!sector) {
+      setError('Please select a sector.')
+      return
+    }
+
+    setIsSubmitting(true)
+
+    let createdCaseId: string | null = null
+    let createdDocumentId: string | null = null
+
+    try {
+      // ====================================================
+      // 1. CREATE CASE
+      // ====================================================
+
+      const caseResponse = await createCase({
+        customer: {
+          name: formData.name.trim(),
+          phone: formData.phone.trim(),
+          email: formData.email.trim() || undefined,
+          address: formData.address.trim() || undefined,
+        },
+
+        incomingReferenceNo:
+          formData.reference.trim(),
+
+        subject:
+          formData.subject.trim(),
+      })
+
+      createdCaseId = caseResponse.data.caseId
+
+      const trackingNumber =
+        caseResponse.data.trackingNumber
+
+      // ====================================================
+      // 2. UPLOAD MAIN DOCUMENT
+      // ====================================================
+
+      const documentResponse =
+        await uploadDocument(
+          createdCaseId,
+          mainDocument,
+          documentType,
+          documentTitle.trim()
+        )
+
+      createdDocumentId =
+        documentResponse.data.documentId
+
+      // ====================================================
+      // 3. UPLOAD OPTIONAL ATTACHMENTS
+      // ====================================================
+
+      for (const attachment of attachments) {
+        await uploadAttachment(
+          createdCaseId,
+          createdDocumentId,
+          attachment
+        )
+      }
+
+      // ====================================================
+      // 4. ASSIGN CASE TO SELECTED SECTOR
+      // ====================================================
+      //
+      // IMPORTANT:
+      // sector contains the organizational unit ID.
+      //
+      // We send the ID to the backend.
+      // We NEVER send the displayed sector name here.
+      //
+      // Example:
+      //
+      // UI:
+      // Housing Development Sector
+      //
+      // API:
+      // toUnitId: "uuid-of-housing-development-sector"
+      //
+      // ====================================================
+
+      await assignCase(createdCaseId, {
+        toUnitId: sector,
+        remarks:
+          formData.notes.trim() || undefined,
+      })
+
+      // ====================================================
+      // 5. SUCCESS
+      // ====================================================
+
+      if (!createdDocumentId) {
+        throw new Error('Main document was not created.')
+      }
+      
+      setRegistrationResult({
+        caseId: createdCaseId,
+        documentId: createdDocumentId,
+        trackingNumber,
+      })
+
+      setStep('done')
+    } catch (err: any) {
+      console.error(
+        'Case registration failed:',
+        err
+      )
+
+      // Case was created but document failed
+      if (
+        createdCaseId &&
+        !createdDocumentId
+      ) {
+        setError(
+          `Case ${createdCaseId} was created, but the main document could not be uploaded. Please do not register the case again.`
+        )
+      }
+
+      // Case and document were created but assignment failed
+      else if (
+        createdCaseId &&
+        createdDocumentId
+      ) {
+        setError(
+          `The case and document were created, but the case could not be sent to the selected sector. Please do not register the case again.`
+        )
+      }
+
+      // Case wasn't created
+      else {
+        setError(
+          err?.response?.data?.message ||
+          'Unable to register the case. Please check the information and try again.'
+        )
+      }
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  // ─────────────────────────────────────────────
+  // Registration successful
+  // ─────────────────────────────────────────────
 
   if (step === 'done') {
     return (
       <div className="p-6 flex justify-center">
         <div className="max-w-md w-full bg-white rounded-2xl shadow-sm border border-gray-100 p-10 text-center">
-          <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center text-3xl mx-auto mb-5">✅</div>
-          <h2 className="text-xl font-black text-gray-900 mb-2" style={{ fontFamily: 'var(--font-display)' }}>{t('caseRegisteredTitle')}</h2>
-          <p className="text-gray-500 text-sm mb-4">{t('caseRegisteredDesc')}</p>
-          <div className="bg-[#EEF4FF] rounded-xl p-4 mb-6">
-            <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-1">{t('trackingNumber')}</p>
-            <p className="text-2xl font-black text-[#1E4B8F] font-mono">{generatedId}</p>
-            <p className="text-xs text-gray-500 mt-1">{t('assignedTo')} {sector}</p>
+
+          <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center text-3xl mx-auto mb-5">
+            ✅
           </div>
+
+          <h2
+            className="text-xl font-black text-gray-900 mb-2"
+            style={{ fontFamily: 'var(--font-display)' }}
+          >
+            {t('caseRegisteredTitle')}
+          </h2>
+
+          <p className="text-gray-500 text-sm mb-4">
+            {t('caseRegisteredDesc')}
+          </p>
+
+          <div className="bg-[#EEF4FF] rounded-xl p-4 mb-6">
+
+            <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-1">
+              {t('trackingNumber')}
+            </p>
+
+            <p className="text-2xl font-black text-[#1E4B8F] font-mono">
+              {registrationResult?.trackingNumber}
+            </p>
+
+            {/* IMPORTANT:
+                Display sector NAME, not sector ID.
+            */}
+            <p className="text-xs text-gray-500 mt-2">
+              {t('assignedTo')}{' '}
+              <span className="font-semibold text-gray-700">
+                {selectedSector?.name ?? 'Selected Sector'}
+              </span>
+            </p>
+          </div>
+
           <div className="flex gap-3">
-            <Btn onClick={() => { setStep(1); setSector(''); setFormData({ name: '', phone: '', email: '', address: '', subject: '', reference: '', priority: 'Normal', notes: '' }) }} variant="secondary" className="flex-1">{t('registerAnother')}</Btn>
-            <Btn onClick={onSuccess} className="flex-1">{t('viewCases')}</Btn>
+
+            <Btn
+              onClick={resetForm}
+              variant="secondary"
+              className="flex-1"
+            >
+              {t('registerAnother')}
+            </Btn>
+
+            <Btn
+              onClick={onSuccess}
+              className="flex-1"
+            >
+              {t('viewCases')}
+            </Btn>
+
           </div>
         </div>
       </div>
     )
   }
 
+  // ─────────────────────────────────────────────
+  // Registration form
+  // ─────────────────────────────────────────────
+
   return (
     <div className="p-6">
+
+      {/* Header */}
       <div className="flex items-center gap-3 mb-6">
-        <button onClick={onSuccess} className="text-sm text-gray-500 hover:text-gray-700">←</button>
-        <h2 className="text-xl font-black text-gray-900" style={{ fontFamily: 'var(--font-display)' }}>{t('registerNewCaseTitle')}</h2>
+
+        <button
+          onClick={onSuccess}
+          className="text-sm text-gray-500 hover:text-gray-700"
+        >
+          ←
+        </button>
+
+        <h2
+          className="text-xl font-black text-gray-900"
+          style={{ fontFamily: 'var(--font-display)' }}
+        >
+          {t('registerNewCaseTitle')}
+        </h2>
+
       </div>
+
+      {/* Error */}
+      {error && (
+        <div className="max-w-xl mb-5 bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-sm">
+          <div className="flex items-start gap-2">
+            <span>⚠️</span>
+
+            <p>{error}</p>
+          </div>
+        </div>
+      )}
 
       {/* Steps */}
       <div className="flex items-center gap-2 mb-8">
-        {[t('step_customerInfo'), t('step_caseDetails'), t('step_docsSector')].map((s, i) => (
-          <div key={s} className="flex items-center gap-2">
-            <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${step > i + 1 ? 'bg-green-500 text-white' : step === i + 1 ? 'bg-[#1E4B8F] text-white' : 'bg-gray-200 text-gray-500'}`}>
-              {step > i + 1 ? '✓' : i + 1}
+
+        {[
+          t('step_customerInfo'),
+          t('step_caseDetails'),
+          t('step_docsSector'),
+        ].map((s, i) => (
+          <div
+            key={s}
+            className="flex items-center gap-2"
+          >
+
+            <div
+              className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${
+                step > i + 1
+                  ? 'bg-green-500 text-white'
+                  : step === i + 1
+                    ? 'bg-[#1E4B8F] text-white'
+                    : 'bg-gray-200 text-gray-500'
+              }`}
+            >
+              {step > i + 1
+                ? '✓'
+                : i + 1}
             </div>
-            <span className={`text-xs font-semibold ${step === i + 1 ? 'text-gray-900' : 'text-gray-400'}`}>{s}</span>
-            {i < 2 && <span className="text-gray-200 mx-1">—</span>}
+
+            <span
+              className={`text-xs font-semibold ${
+                step === i + 1
+                  ? 'text-gray-900'
+                  : 'text-gray-400'
+              }`}
+            >
+              {s}
+            </span>
+
+            {i < 2 && (
+              <span className="text-gray-200 mx-1">
+                —
+              </span>
+            )}
           </div>
         ))}
       </div>
 
       <div className="max-w-xl">
+
+        {/* =================================================
+            STEP 1 — CUSTOMER
+        ================================================= */}
+
         {step === 1 && (
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 space-y-4">
-            <h3 className="font-bold text-gray-800 mb-2">{t('customerInformation')}</h3>
-            <Input label={t('label_fullName')} value={formData.name} onChange={e => update('name', e.target.value)} placeholder={t('ph_name')} />
-            <Input label={t('label_phone')} value={formData.phone} onChange={e => update('phone', e.target.value)} placeholder={t('ph_phone')} />
-            <Input label={t('label_email')} value={formData.email} onChange={e => update('email', e.target.value)} placeholder={t('ph_email')} type="email" />
-            <Textarea label={t('label_address')} value={formData.address} onChange={e => update('address', e.target.value)} placeholder={t('ph_address')} rows={2} />
+
+            <h3 className="font-bold text-gray-800 mb-2">
+              {t('customerInformation')}
+            </h3>
+
+            <Input
+              label={t('label_fullName')}
+              value={formData.name}
+              onChange={e =>
+                update('name', e.target.value)
+              }
+              placeholder={t('ph_name')}
+            />
+
+            <Input
+              label={t('label_phone')}
+              value={formData.phone}
+              onChange={e =>
+                update('phone', e.target.value)
+              }
+              placeholder={t('ph_phone')}
+            />
+
+            <Input
+              label={t('label_email')}
+              value={formData.email}
+              onChange={e =>
+                update('email', e.target.value)
+              }
+              placeholder={t('ph_email')}
+              type="email"
+            />
+
+            <Textarea
+              label={t('label_address')}
+              value={formData.address}
+              onChange={e =>
+                update('address', e.target.value)
+              }
+              placeholder={t('ph_address')}
+              rows={2}
+            />
+
             <div className="flex justify-end pt-2">
-              <Btn onClick={() => setStep(2)} disabled={!formData.name || !formData.phone}>{t('nextBtn')}</Btn>
+
+              <Btn
+                onClick={() => {
+                  setError('')
+                  setStep(2)
+                }}
+                disabled={
+                  !formData.name.trim() ||
+                  !formData.phone.trim()
+                }
+              >
+                {t('nextBtn')}
+              </Btn>
+
             </div>
           </div>
         )}
+
+        {/* =================================================
+            STEP 2 — CASE DETAILS
+        ================================================= */}
 
         {step === 2 && (
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 space-y-4">
-            <h3 className="font-bold text-gray-800 mb-2">{t('caseInformation')}</h3>
-            <Input label={t('label_subject')} value={formData.subject} onChange={e => update('subject', e.target.value)} placeholder={t('ph_subject')} />
-            <Input label={t('label_incomingRef')} value={formData.reference} onChange={e => update('reference', e.target.value)} placeholder={t('ph_ref')} />
+
+            <h3 className="font-bold text-gray-800 mb-2">
+              {t('caseInformation')}
+            </h3>
+
+            <Input
+              label={t('label_subject')}
+              value={formData.subject}
+              onChange={e =>
+                update('subject', e.target.value)
+              }
+              placeholder={t('ph_subject')}
+            />
+
+            <Input
+              label={t('label_incomingRef')}
+              value={formData.reference}
+              onChange={e =>
+                update('reference', e.target.value)
+              }
+              placeholder={t('ph_ref')}
+            />
+
             <Select
               label={t('label_priority')}
               value={formData.priority}
-              onChange={e => update('priority', e.target.value)}
-              options={[{ value: 'High', label: t('priority_High') }, { value: 'Normal', label: t('priority_Normal') }, { value: 'Low', label: t('priority_Low') }]}
+              onChange={e =>
+                update('priority', e.target.value)
+              }
+              options={[
+                {
+                  value: 'High',
+                  label: t('priority_High'),
+                },
+                {
+                  value: 'Normal',
+                  label: t('priority_Normal'),
+                },
+                {
+                  value: 'Low',
+                  label: t('priority_Low'),
+                },
+              ]}
             />
-            <Textarea label={t('label_notes')} value={formData.notes} onChange={e => update('notes', e.target.value)} placeholder={t('ph_notes')} rows={3} />
+
+            <Textarea
+              label={t('label_notes')}
+              value={formData.notes}
+              onChange={e =>
+                update('notes', e.target.value)
+              }
+              placeholder={t('ph_notes')}
+              rows={3}
+            />
+
             <div className="flex justify-between pt-2">
-              <Btn variant="secondary" onClick={() => setStep(1)}>{t('backBtn')}</Btn>
-              <Btn onClick={() => setStep(3)} disabled={!formData.subject || !formData.reference}>{t('nextBtn')}</Btn>
+
+              <Btn
+                variant="secondary"
+                onClick={() => {
+                  setError('')
+                  setStep(1)
+                }}
+              >
+                {t('backBtn')}
+              </Btn>
+
+              <Btn
+                onClick={() => {
+                  setError('')
+                  setStep(3)
+                }}
+                disabled={
+                  !formData.subject.trim() ||
+                  !formData.reference.trim()
+                }
+              >
+                {t('nextBtn')}
+              </Btn>
+
             </div>
           </div>
         )}
+
+        {/* =================================================
+            STEP 3 — DOCUMENTS + SECTOR
+        ================================================= */}
 
         {step === 3 && (
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 space-y-5">
-            <h3 className="font-bold text-gray-800 mb-2">{t('step_docsSector')}</h3>
+
+            <h3 className="font-bold text-gray-800 mb-2">
+              {t('step_docsSector')}
+            </h3>
+
+            {/* ---------------------------------------------
+                DOCUMENT TITLE
+            --------------------------------------------- */}
+
+            <Input
+              label="Document Title"
+              value={documentTitle}
+              onChange={e =>
+                setDocumentTitle(e.target.value)
+              }
+              placeholder="Enter document title"
+            />
+
+            {/* ---------------------------------------------
+                DOCUMENT TYPE
+            --------------------------------------------- */}
+
+            <Select
+              label="Document Type"
+              value={documentType}
+              onChange={e =>
+                setDocumentType(e.target.value)
+              }
+              options={[
+                {
+                  value: 'Application Form',
+                  label: 'Application Form',
+                },
+                {
+                  value: 'Official Letter',
+                  label: 'Official Letter',
+                },
+                {
+                  value: 'Request Letter',
+                  label: 'Request Letter',
+                },
+                {
+                  value: 'Report',
+                  label: 'Report',
+                },
+                {
+                  value: 'Other',
+                  label: 'Other',
+                },
+              ]}
+            />
+
+            {/* ---------------------------------------------
+                MAIN DOCUMENT
+            --------------------------------------------- */}
 
             <div>
-              <p className="text-xs font-bold text-gray-600 mb-2">{t('label_mainDoc')}</p>
-              <div className="border-2 border-dashed border-gray-200 rounded-xl p-6 text-center hover:border-[#1E4B8F]/40 transition-colors cursor-pointer bg-gray-50">
-                <div className="text-3xl mb-2">📄</div>
-                <p className="text-sm font-semibold text-gray-600">{t('uploadHint')}</p>
-                <p className="text-xs text-gray-400 mt-1">{t('uploadSub')}</p>
-              </div>
-            </div>
-            <div>
-              <p className="text-xs font-bold text-gray-600 mb-2">{t('label_attachments')}</p>
-              <div className="border-2 border-dashed border-gray-200 rounded-xl p-4 text-center hover:border-[#1E4B8F]/40 transition-colors cursor-pointer bg-gray-50">
-                <p className="text-sm text-gray-500">{t('uploadMore')}</p>
-              </div>
+
+              <p className="text-xs font-bold text-gray-600 mb-2">
+                {t('label_mainDoc')} *
+              </p>
+
+              <label className="block border-2 border-dashed border-gray-200 rounded-xl p-6 text-center hover:border-[#1E4B8F]/40 transition-colors cursor-pointer bg-gray-50">
+
+                <input
+                  type="file"
+                  className="hidden"
+                  onChange={e => {
+                    const file =
+                      e.target.files?.[0] || null
+
+                    setMainDocument(file)
+
+                    if (file) {
+                      setError('')
+                    }
+                  }}
+                />
+
+                <div className="text-3xl mb-2">
+                  📄
+                </div>
+
+                {mainDocument ? (
+                  <>
+                    <p className="text-sm font-semibold text-[#1E4B8F]">
+                      {mainDocument.name}
+                    </p>
+
+                    <p className="text-xs text-gray-400 mt-1">
+                      {(
+                        mainDocument.size /
+                        1024 /
+                        1024
+                      ).toFixed(2)}{' '}
+                      MB
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-sm font-semibold text-gray-600">
+                      {t('uploadHint')}
+                    </p>
+
+                    <p className="text-xs text-gray-400 mt-1">
+                      {t('uploadSub')}
+                    </p>
+                  </>
+                )}
+
+              </label>
             </div>
 
+            {/* ---------------------------------------------
+                ATTACHMENTS
+            --------------------------------------------- */}
+
             <div>
-              <p className="text-xs font-bold text-gray-600 mb-2">{t('label_selectSector')}</p>
+
+              <p className="text-xs font-bold text-gray-600 mb-2">
+                {t('label_attachments')}
+              </p>
+
+              <label className="block border-2 border-dashed border-gray-200 rounded-xl p-4 text-center hover:border-[#1E4B8F]/40 transition-colors cursor-pointer bg-gray-50">
+
+                <input
+                  type="file"
+                  multiple
+                  className="hidden"
+                  onChange={e => {
+                    const files = Array.from(
+                      e.target.files || []
+                    )
+
+                    setAttachments(prev => [
+                      ...prev,
+                      ...files,
+                    ])
+
+                    // Reset input so the same file
+                    // can be selected again if needed.
+                    e.currentTarget.value = ''
+                  }}
+                />
+
+                <div className="text-2xl mb-1">
+                  📎
+                </div>
+
+                <p className="text-sm text-gray-500">
+                  {t('uploadMore')}
+                </p>
+
+                <p className="text-xs text-gray-400 mt-1">
+                  You can select multiple files
+                </p>
+
+              </label>
+
+              {/* Selected attachments */}
+              {attachments.length > 0 && (
+                <div className="mt-3 space-y-2">
+
+                  {attachments.map(
+                    (file, index) => (
+                      <div
+                        key={`${file.name}-${index}`}
+                        className="flex items-center justify-between bg-gray-50 border border-gray-100 rounded-lg px-3 py-2"
+                      >
+
+                        <div className="flex items-center gap-2 min-w-0">
+
+                          <span>📎</span>
+
+                          <div className="min-w-0">
+                            <p className="text-sm text-gray-700 truncate">
+                              {file.name}
+                            </p>
+
+                            <p className="text-xs text-gray-400">
+                              {(
+                                file.size /
+                                1024 /
+                                1024
+                              ).toFixed(2)}{' '}
+                              MB
+                            </p>
+                          </div>
+
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setAttachments(prev =>
+                              prev.filter(
+                                (_, i) =>
+                                  i !== index
+                              )
+                            )
+                          }
+                          className="text-xs text-red-500 hover:underline ml-3 flex-shrink-0"
+                        >
+                          Remove
+                        </button>
+
+                      </div>
+                    )
+                  )}
+
+                </div>
+              )}
+
+            </div>
+
+            {/* ---------------------------------------------
+                SELECT SECTOR
+            --------------------------------------------- */}
+
+          <div>
+            <p className="text-xs font-bold text-gray-600 mb-2">
+              {t('label_selectSector')} *
+            </p>
+
+            {loadingSectors ? (
+              <p className="text-sm text-gray-400">Loading sectors...</p>
+            ) : sectorsError ? (
+              <p className="text-sm text-red-500">{sectorsError}</p>
+            ) : sectors.length === 0 ? (
+              <p className="text-sm text-gray-400">No active sectors available.</p>
+            ) : (
               <div className="space-y-2">
-                {SECTORS.map(s => (
+                {sectors.map(s => (
                   <button
-                    key={s}
-                    onClick={() => setSector(s)}
-                    className={`w-full text-left px-4 py-3 rounded-xl border-2 text-sm font-medium transition-all ${sector === s ? 'border-[#1E4B8F] bg-[#EEF4FF] text-[#1E4B8F]' : 'border-gray-200 text-gray-700 hover:border-gray-300 bg-white'}`}
+                    type="button"
+                    key={s.unitId}
+                    onClick={() => {
+                      setSector(s.unitId)
+                      setError('')
+                    }}
+                    className={`w-full text-left px-4 py-3 rounded-xl border-2 text-sm font-medium transition-all ${
+                      sector === s.unitId
+                        ? 'border-[#1E4B8F] bg-[#EEF4FF] text-[#1E4B8F]'
+                        : 'border-gray-200 text-gray-700 hover:border-gray-300 bg-white'
+                    }`}
                   >
-                    {s}
+                    {s.name}
                   </button>
                 ))}
               </div>
-            </div>
+            )}
 
-            <div className="flex justify-between pt-2">
-              <Btn variant="secondary" onClick={() => setStep(2)}>{t('backBtn')}</Btn>
-              <Btn onClick={() => setStep('done')} disabled={!sector} variant="success">
-                ✓ {t('registerCase')}
-              </Btn>
-            </div>
+            {selectedSector && (
+              <div className="mt-3 bg-blue-50 border border-blue-100 rounded-lg px-3 py-2">
+                <p className="text-xs text-gray-500">Selected sector</p>
+                <p className="text-sm font-semibold text-[#1E4B8F]">
+                  {selectedSector.name}
+                </p>
+              </div>
+            )}
           </div>
-        )}
-      </div>
-    </div>
-  )
-}
 
-// ── Case Detail (shared across roles) ─────────────────
-export function CaseDetail({ c, tab, setTab, onBack, role }: { c: CaseRecord; tab: string; setTab: (t: string) => void; onBack: () => void; role: string }) {
+                      {/* ---------------------------------------------
+                          BUTTONS
+                      --------------------------------------------- */}
+
+                      <div className="flex justify-between pt-2">
+
+                        <Btn
+                          variant="secondary"
+                          onClick={() => {
+                            setError('')
+                            setStep(2)
+                          }}
+                          disabled={isSubmitting}
+                        >
+                          {t('backBtn')}
+                        </Btn>
+
+                        <Btn
+                          onClick={handleRegisterCase}
+                          disabled={
+                            !sector ||
+                            !mainDocument ||
+                            !documentTitle.trim() ||
+                            !documentType.trim() ||
+                            isSubmitting
+                          }
+                          variant="success"
+                        >
+                          {isSubmitting
+                            ? 'Registering...'
+                            : `✓ ${t('registerCase')}`}
+                        </Btn>
+
+                      </div>
+
+                    </div>
+                  )}
+                </div>
+              </div>
+            )
+          }
+
+// ─────────────────────────────────────────────────────
+// Case Detail
+// ─────────────────────────────────────────────────────
+
+export function CaseDetail({
+  c,
+  tab,
+  setTab,
+  onBack,
+  role,
+}: {
+  c: CaseRecord
+  tab: string
+  setTab: (t: string) => void
+  onBack: () => void
+  role: string
+}) {
   const { t } = useLanguage()
-  const [approveOpen, setApproveOpen] = useState(false)
-  const [rejectOpen, setRejectOpen] = useState(false)
-  const [assignOpen, setAssignOpen] = useState(false)
-  const [returnOpen, setReturnOpen] = useState(false)
-  const [remarkText, setRemarkText] = useState('')
-  const [rejectReason, setRejectReason] = useState('')
-  const [workSummary, setWorkSummary] = useState('')
 
-  const tabs = [t('tabOverview'), t('tabDocuments'), t('tabWorkflow'), t('tabRemarks')]
+  const [approveOpen, setApproveOpen] =
+    useState(false)
+
+  const [rejectOpen, setRejectOpen] =
+    useState(false)
+
+  const [assignOpen, setAssignOpen] =
+    useState(false)
+
+  const [returnOpen, setReturnOpen] =
+    useState(false)
+
+  const [remarkText, setRemarkText] =
+    useState('')
+
+  const [rejectReason, setRejectReason] =
+    useState('')
+
+  const [workSummary, setWorkSummary] =
+    useState('')
+
+  const tabs = [
+    t('tabOverview'),
+    t('tabDocuments'),
+    t('tabWorkflow'),
+    t('tabRemarks'),
+  ]
 
   return (
     <div className="p-6">
-      <button onClick={onBack} className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 mb-5 transition-colors">
+
+      {/* Back */}
+      <button
+        onClick={onBack}
+        className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 mb-5 transition-colors"
+      >
         {t('backToCases')}
       </button>
 
       {/* Header */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-4">
+
         <div className="flex items-start justify-between gap-4">
+
           <div>
-            <p className="font-mono text-xs font-bold text-gray-400 mb-1">{c.id}</p>
-            <h1 className="text-2xl font-black text-gray-900 mb-3" style={{ fontFamily: 'var(--font-display)' }}>{c.subject}</h1>
+
+            <p className="font-mono text-xs font-bold text-gray-400 mb-1">
+              {c.id}
+            </p>
+
+            <h1
+              className="text-2xl font-black text-gray-900 mb-3"
+              style={{
+                fontFamily: 'var(--font-display)',
+              }}
+            >
+              {c.subject}
+            </h1>
+
             <div className="flex items-center flex-wrap gap-2">
+
               <StatusBadge status={c.status} />
-              <PriorityBadge priority={c.priority} />
-              <span className="text-xs text-gray-400">{t('fieldRegistered')} {c.date}</span>
+
+              <PriorityBadge
+                priority={c.priority}
+              />
+
+              <span className="text-xs text-gray-400">
+                {t('fieldRegistered')} {c.date}
+              </span>
+
             </div>
+
           </div>
-          {/* Action buttons per role */}
+
+          {/* Action buttons */}
           <div className="flex gap-2 flex-wrap justify-end">
+
+            {/* Sector */}
             {role === 'sector' && (
               <>
-                {(c.status === 'New' || c.status === 'Submitted') && (
-                  <Btn size="sm" onClick={() => setAssignOpen(true)}>{t('modal_assignDir')}</Btn>
+                {(c.status === 'New' ||
+                  c.status === 'Submitted') && (
+                  <Btn
+                    size="sm"
+                    onClick={() =>
+                      setAssignOpen(true)
+                    }
+                  >
+                    {t('modal_assignDir')}
+                  </Btn>
                 )}
+
                 {c.status === 'In Progress' && (
                   <>
-                    <Btn size="sm" variant="success" onClick={() => setApproveOpen(true)}>✓ {t('approve')}</Btn>
-                    <Btn size="sm" variant="danger" onClick={() => setRejectOpen(true)}>✕ {t('reject')}</Btn>
-                    <Btn size="sm" variant="secondary" onClick={() => setReturnOpen(true)}>↩ {t('return')}</Btn>
+                    <Btn
+                      size="sm"
+                      variant="success"
+                      onClick={() =>
+                        setApproveOpen(true)
+                      }
+                    >
+                      ✓ {t('approve')}
+                    </Btn>
+
+                    <Btn
+                      size="sm"
+                      variant="danger"
+                      onClick={() =>
+                        setRejectOpen(true)
+                      }
+                    >
+                      ✕ {t('reject')}
+                    </Btn>
+
+                    <Btn
+                      size="sm"
+                      variant="secondary"
+                      onClick={() =>
+                        setReturnOpen(true)
+                      }
+                    >
+                      ↩ {t('return')}
+                    </Btn>
                   </>
                 )}
               </>
             )}
+
+            {/* Directorate */}
             {role === 'directorate' && (
               <>
-                {(c.status === 'New' || c.status === 'Submitted' || c.status === 'In Progress') && (
-                  <Btn size="sm" onClick={() => setAssignOpen(true)}>{t('modal_assignGroup')}</Btn>
+                {(c.status === 'New' ||
+                  c.status === 'Submitted' ||
+                  c.status === 'In Progress') && (
+                  <Btn
+                    size="sm"
+                    onClick={() =>
+                      setAssignOpen(true)
+                    }
+                  >
+                    {t('modal_assignGroup')}
+                  </Btn>
                 )}
-                <Btn size="sm" variant="secondary" onClick={() => setReturnOpen(true)}>↩ {t('sendToDirectorate')}</Btn>
+
+                <Btn
+                  size="sm"
+                  variant="secondary"
+                  onClick={() =>
+                    setReturnOpen(true)
+                  }
+                >
+                  ↩ {t('sendToDirectorate')}
+                </Btn>
               </>
             )}
+
+            {/* Group */}
             {role === 'group' && (
               <>
                 {c.status === 'In Progress' && (
-                  <Btn size="sm" variant="success" onClick={() => setApproveOpen(true)}>✓ {t('completeWork')}</Btn>
+                  <Btn
+                    size="sm"
+                    variant="success"
+                    onClick={() =>
+                      setApproveOpen(true)
+                    }
+                  >
+                    ✓ {t('completeWork')}
+                  </Btn>
                 )}
+
                 {c.status === 'New' && (
-                  <Btn size="sm" onClick={() => setApproveOpen(true)}>▶ {t('startWork')}</Btn>
+                  <Btn
+                    size="sm"
+                    onClick={() =>
+                      setApproveOpen(true)
+                    }
+                  >
+                    ▶ {t('startWork')}
+                  </Btn>
                 )}
-                <Btn size="sm" variant="secondary" onClick={() => setReturnOpen(true)}>↩ {t('sendToDirectorate')}</Btn>
+
+                <Btn
+                  size="sm"
+                  variant="secondary"
+                  onClick={() =>
+                    setReturnOpen(true)
+                  }
+                >
+                  ↩ {t('sendToDirectorate')}
+                </Btn>
               </>
             )}
+
           </div>
         </div>
+
+        {/* Current location */}
         <div className="flex items-center gap-2 mt-4 text-xs text-gray-500 bg-gray-50 rounded-lg px-3 py-2">
           <span>📍</span>
-          <span>{t('currentLocation')} <strong className="text-gray-700">{c.directorate} → {c.group}</strong></span>
+
+          <span>
+            {t('currentLocation')}{' '}
+
+            <strong className="text-gray-700">
+              {c.directorate} → {c.group}
+            </strong>
+          </span>
         </div>
+
       </div>
 
       {/* Tabs */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-        <TabBar tabs={tabs} active={tab} onChange={setTab} />
 
+        <TabBar
+          tabs={tabs}
+          active={tab}
+          onChange={setTab}
+        />
+
+        {/* Overview */}
         {tab === t('tabOverview') && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+
             <div className="space-y-4">
-              <Section title={t('customerInformation')}>
-                <Row label={t('fieldName')} val={c.customer} />
-                <Row label={t('fieldPhone')} val={c.customerPhone} mono />
-                <Row label={t('fieldEmail')} val={c.customerEmail} />
-                <Row label={t('fieldAddress')} val={c.customerAddress} />
+
+              <Section
+                title={t('customerInformation')}
+              >
+                <Row
+                  label={t('fieldName')}
+                  val={c.customer}
+                />
+
+                <Row
+                  label={t('fieldPhone')}
+                  val={c.customerPhone}
+                  mono
+                />
+
+                <Row
+                  label={t('fieldEmail')}
+                  val={c.customerEmail}
+                />
+
+                <Row
+                  label={t('fieldAddress')}
+                  val={c.customerAddress}
+                />
               </Section>
+
             </div>
+
             <div className="space-y-4">
-              <Section title={t('caseInformation')}>
-                <Row label={t('col_trackingNo')} val={c.id} mono />
-                <Row label={t('fieldReference')} val={c.reference} mono />
-                <Row label={t('fieldSector')} val={c.sector} />
-                <Row label={t('fieldDirectorate')} val={c.directorate} />
-                <Row label={t('fieldGroup')} val={c.group} />
-                <Row label={t('fieldRegistered')} val={c.date} />
-                <Row label={t('fieldLastActivity')} val={c.lastActivity} />
+
+              <Section
+                title={t('caseInformation')}
+              >
+                <Row
+                  label={t('col_trackingNo')}
+                  val={c.id}
+                  mono
+                />
+
+                <Row
+                  label={t('fieldReference')}
+                  val={c.reference}
+                  mono
+                />
+
+                <Row
+                  label={t('fieldSector')}
+                  val={c.sector}
+                />
+
+                <Row
+                  label={t('fieldDirectorate')}
+                  val={c.directorate}
+                />
+
+                <Row
+                  label={t('fieldGroup')}
+                  val={c.group}
+                />
+
+                <Row
+                  label={t('fieldRegistered')}
+                  val={c.date}
+                />
+
+                <Row
+                  label={t('fieldLastActivity')}
+                  val={c.lastActivity}
+                />
               </Section>
+
             </div>
           </div>
         )}
 
+        {/* Documents */}
         {tab === t('tabDocuments') && (
           <div className="space-y-3">
+
             <div className="mb-4">
-              <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-2">{t('mainDocument')}</p>
-              {c.documents.filter(d => d.type === 'main').map((d, i) => (
-                <DocRow key={i} doc={d} />
-              ))}
+
+              <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-2">
+                {t('mainDocument')}
+              </p>
+
+              {c.documents
+                .filter(d => d.type === 'main')
+                .map((d, i) => (
+                  <DocRow
+                    key={i}
+                    doc={d}
+                  />
+                ))}
+
             </div>
+
             <div>
-              <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-2">{t('attachmentsLabel')}</p>
-              {c.documents.filter(d => d.type === 'attachment').map((d, i) => (
-                <DocRow key={i} doc={d} />
-              ))}
+
+              <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-2">
+                {t('attachmentsLabel')}
+              </p>
+
+              {c.documents
+                .filter(
+                  d => d.type === 'attachment'
+                )
+                .map((d, i) => (
+                  <DocRow
+                    key={i}
+                    doc={d}
+                  />
+                ))}
+
             </div>
+
             <div className="pt-3">
-              <Btn variant="secondary" size="sm">+ {t('uploadDoc')}</Btn>
+
+              <Btn
+                variant="secondary"
+                size="sm"
+              >
+                + {t('uploadDoc')}
+              </Btn>
+
             </div>
           </div>
         )}
 
+        {/* Workflow */}
         {tab === t('tabWorkflow') && (
           <div className="max-w-sm">
-            <CaseTimeline steps={c.timeline} />
+            <CaseTimeline
+              steps={c.timeline}
+            />
           </div>
         )}
 
+        {/* Remarks */}
         {tab === t('tabRemarks') && (
           <div className="space-y-4">
+
             {c.remarks.map((r, i) => (
-              <div key={i} className="bg-gray-50 rounded-xl p-4 border border-gray-100">
+              <div
+                key={i}
+                className="bg-gray-50 rounded-xl p-4 border border-gray-100"
+              >
+
                 <div className="flex items-center gap-2 mb-2">
-                  <div className="w-7 h-7 rounded-full bg-[#1E4B8F]/10 flex items-center justify-center text-xs font-bold text-[#1E4B8F]">{r.author[0]}</div>
+
+                  <div className="w-7 h-7 rounded-full bg-[#1E4B8F]/10 flex items-center justify-center text-xs font-bold text-[#1E4B8F]">
+                    {r.author[0]}
+                  </div>
+
                   <div>
-                    <p className="text-xs font-bold text-gray-800">{r.author}</p>
-                    <p className="text-xs text-gray-400">{r.timestamp}</p>
+
+                    <p className="text-xs font-bold text-gray-800">
+                      {r.author}
+                    </p>
+
+                    <p className="text-xs text-gray-400">
+                      {r.timestamp}
+                    </p>
+
                   </div>
                 </div>
-                <p className="text-sm text-gray-700 leading-relaxed">{r.content}</p>
+
+                <p className="text-sm text-gray-700 leading-relaxed">
+                  {r.content}
+                </p>
+
               </div>
             ))}
+
             <div className="pt-2 space-y-2">
+
               <textarea
                 value={remarkText}
-                onChange={e => setRemarkText(e.target.value)}
+                onChange={e =>
+                  setRemarkText(e.target.value)
+                }
                 placeholder={t('ph_closingRemark')}
                 rows={3}
                 className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#1E4B8F]/20 resize-none"
               />
-              <Btn size="sm" disabled={!remarkText}>{t('addRemark')}</Btn>
+
+              <Btn
+                size="sm"
+                disabled={!remarkText.trim()}
+              >
+                {t('addRemark')}
+              </Btn>
+
             </div>
           </div>
         )}
+
       </div>
 
-      {/* Modals */}
-      <Modal open={approveOpen} onClose={() => setApproveOpen(false)} title={role === 'group' ? t('modal_completeWork') : t('modal_approveCase')}>
-        <Textarea label={role === 'group' ? t('label_workSummary') : t('label_optRemark')} value={workSummary} onChange={e => setWorkSummary(e.target.value)} placeholder={role === 'group' ? t('ph_workSummary') : t('ph_closingRemark')} />
-        <div className="flex gap-3 mt-4">
-          <Btn variant="secondary" onClick={() => setApproveOpen(false)} className="flex-1">{t('cancel')}</Btn>
-          <Btn variant="success" onClick={() => setApproveOpen(false)} className="flex-1">{role === 'group' ? t('completeWork') : t('confirmApproval')}</Btn>
-        </div>
-      </Modal>
+      {/* =================================================
+          APPROVE / COMPLETE MODAL
+      ================================================= */}
 
-      <Modal open={rejectOpen} onClose={() => setRejectOpen(false)} title={t('modal_rejectCase')}>
-        <div className="space-y-3">
-          <Textarea label={t('label_reason')} value={rejectReason} onChange={e => setRejectReason(e.target.value)} placeholder={t('ph_rejectReason')} />
-          <div className="flex items-start gap-2 bg-amber-50 rounded-lg px-3 py-2 text-xs text-amber-700">
-            <span>⚠️</span>
-            <span>{t('customerVisible')}</span>
-          </div>
-        </div>
-        <div className="flex gap-3 mt-4">
-          <Btn variant="secondary" onClick={() => setRejectOpen(false)} className="flex-1">{t('cancel')}</Btn>
-          <Btn variant="danger" disabled={!rejectReason} onClick={() => setRejectOpen(false)} className="flex-1">{t('confirmRejection')}</Btn>
-        </div>
-      </Modal>
+      <Modal
+        open={approveOpen}
+        onClose={() =>
+          setApproveOpen(false)
+        }
+        title={
+          role === 'group'
+            ? t('modal_completeWork')
+            : t('modal_approveCase')
+        }
+      >
 
-      <Modal open={assignOpen} onClose={() => setAssignOpen(false)} title={role === 'directorate' ? t('modal_assignGroup') : t('modal_assignDir')}>
-        <p className="text-sm text-gray-600 mb-4">Case: <span className="font-mono font-semibold">{c.id}</span></p>
-        <Select
-          label={role === 'directorate' ? t('label_selectGroup') : t('label_selectDir')}
-          options={role === 'directorate'
-            ? [{ value: 'Group A1', label: 'Group A1' }, { value: 'Group A2', label: 'Group A2' }]
-            : [{ value: 'Directorate A', label: 'Directorate A' }, { value: 'Directorate B', label: 'Directorate B' }, { value: 'Directorate C', label: 'Directorate C' }]
+        <Textarea
+          label={
+            role === 'group'
+              ? t('label_workSummary')
+              : t('label_optRemark')
+          }
+          value={workSummary}
+          onChange={e =>
+            setWorkSummary(e.target.value)
+          }
+          placeholder={
+            role === 'group'
+              ? t('ph_workSummary')
+              : t('ph_closingRemark')
           }
         />
-        <Textarea label={t('label_optInstructions')} placeholder={t('ph_instructions')} className="mt-3" />
+
         <div className="flex gap-3 mt-4">
-          <Btn variant="secondary" onClick={() => setAssignOpen(false)} className="flex-1">{t('cancel')}</Btn>
-          <Btn onClick={() => setAssignOpen(false)} className="flex-1">{t('assign')}</Btn>
+
+          <Btn
+            variant="secondary"
+            onClick={() =>
+              setApproveOpen(false)
+            }
+            className="flex-1"
+          >
+            {t('cancel')}
+          </Btn>
+
+          <Btn
+            variant="success"
+            onClick={() =>
+              setApproveOpen(false)
+            }
+            className="flex-1"
+          >
+            {role === 'group'
+              ? t('completeWork')
+              : t('confirmApproval')}
+          </Btn>
+
         </div>
       </Modal>
 
-      <Modal open={returnOpen} onClose={() => setReturnOpen(false)} title={t('modal_returnCase')}>
-        <p className="text-sm text-gray-600 mb-4">Case: <span className="font-mono font-semibold">{c.id}</span></p>
-        <Textarea label={t('label_reason')} placeholder={t('ph_returnReason')} />
+      {/* =================================================
+          REJECT MODAL
+      ================================================= */}
+
+      <Modal
+        open={rejectOpen}
+        onClose={() =>
+          setRejectOpen(false)
+        }
+        title={t('modal_rejectCase')}
+      >
+
+        <div className="space-y-3">
+
+          <Textarea
+            label={t('label_reason')}
+            value={rejectReason}
+            onChange={e =>
+              setRejectReason(e.target.value)
+            }
+            placeholder={t('ph_rejectReason')}
+          />
+
+          <div className="flex items-start gap-2 bg-amber-50 rounded-lg px-3 py-2 text-xs text-amber-700">
+
+            <span>⚠️</span>
+
+            <span>
+              {t('customerVisible')}
+            </span>
+
+          </div>
+        </div>
+
         <div className="flex gap-3 mt-4">
-          <Btn variant="secondary" onClick={() => setReturnOpen(false)} className="flex-1">{t('cancel')}</Btn>
-          <Btn variant="secondary" onClick={() => setReturnOpen(false)} className="flex-1 border-orange-200 text-orange-600 hover:bg-orange-50">↩ {t('return')}</Btn>
+
+          <Btn
+            variant="secondary"
+            onClick={() =>
+              setRejectOpen(false)
+            }
+            className="flex-1"
+          >
+            {t('cancel')}
+          </Btn>
+
+          <Btn
+            variant="danger"
+            disabled={!rejectReason.trim()}
+            onClick={() =>
+              setRejectOpen(false)
+            }
+            className="flex-1"
+          >
+            {t('confirmRejection')}
+          </Btn>
+
         </div>
       </Modal>
+
+      {/* =================================================
+          ASSIGN MODAL
+      ================================================= */}
+
+      <Modal
+        open={assignOpen}
+        onClose={() =>
+          setAssignOpen(false)
+        }
+        title={
+          role === 'directorate'
+            ? t('modal_assignGroup')
+            : t('modal_assignDir')
+        }
+      >
+
+        <p className="text-sm text-gray-600 mb-4">
+          Case:{' '}
+          <span className="font-mono font-semibold">
+            {c.id}
+          </span>
+        </p>
+
+        <Select
+          label={
+            role === 'directorate'
+              ? t('label_selectGroup')
+              : t('label_selectDir')
+          }
+          options={
+            role === 'directorate'
+              ? [
+                  {
+                    value: 'Group A1',
+                    label: 'Group A1',
+                  },
+                  {
+                    value: 'Group A2',
+                    label: 'Group A2',
+                  },
+                ]
+              : [
+                  {
+                    value: 'Directorate A',
+                    label: 'Directorate A',
+                  },
+                  {
+                    value: 'Directorate B',
+                    label: 'Directorate B',
+                  },
+                  {
+                    value: 'Directorate C',
+                    label: 'Directorate C',
+                  },
+                ]
+          }
+        />
+
+        <Textarea
+          label={t('label_optInstructions')}
+          placeholder={t('ph_instructions')}
+          className="mt-3"
+        />
+
+        <div className="flex gap-3 mt-4">
+
+          <Btn
+            variant="secondary"
+            onClick={() =>
+              setAssignOpen(false)
+            }
+            className="flex-1"
+          >
+            {t('cancel')}
+          </Btn>
+
+          <Btn
+            onClick={() =>
+              setAssignOpen(false)
+            }
+            className="flex-1"
+          >
+            {t('assign')}
+          </Btn>
+
+        </div>
+      </Modal>
+
+      {/* =================================================
+          RETURN MODAL
+      ================================================= */}
+
+      <Modal
+        open={returnOpen}
+        onClose={() =>
+          setReturnOpen(false)
+        }
+        title={t('modal_returnCase')}
+      >
+
+        <p className="text-sm text-gray-600 mb-4">
+          Case:{' '}
+          <span className="font-mono font-semibold">
+            {c.id}
+          </span>
+        </p>
+
+        <Textarea
+          label={t('label_reason')}
+          placeholder={t('ph_returnReason')}
+        />
+
+        <div className="flex gap-3 mt-4">
+
+          <Btn
+            variant="secondary"
+            onClick={() =>
+              setReturnOpen(false)
+            }
+            className="flex-1"
+          >
+            {t('cancel')}
+          </Btn>
+
+          <Btn
+            variant="secondary"
+            onClick={() =>
+              setReturnOpen(false)
+            }
+            className="flex-1 border-orange-200 text-orange-600 hover:bg-orange-50"
+          >
+            ↩ {t('return')}
+          </Btn>
+
+        </div>
+      </Modal>
+
     </div>
   )
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+// ─────────────────────────────────────────────────────
+// Section
+// ─────────────────────────────────────────────────────
+
+function Section({
+  title,
+  children,
+}: {
+  title: string
+  children: React.ReactNode
+}) {
   return (
     <div>
-      <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-3">{title}</p>
-      <div className="space-y-2.5">{children}</div>
+
+      <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-3">
+        {title}
+      </p>
+
+      <div className="space-y-2.5">
+        {children}
+      </div>
+
     </div>
   )
 }
 
-function Row({ label, val, mono = false }: { label: string; val: string; mono?: boolean }) {
+// ─────────────────────────────────────────────────────
+// Row
+// ─────────────────────────────────────────────────────
+
+function Row({
+  label,
+  val,
+  mono = false,
+}: {
+  label: string
+  val: string
+  mono?: boolean
+}) {
   return (
     <div className="flex gap-3">
-      <span className="text-xs text-gray-400 w-28 flex-shrink-0 pt-0.5">{label}</span>
-      <span className={`text-sm text-gray-800 font-medium ${mono ? 'font-mono' : ''}`}>{val}</span>
+
+      <span className="text-xs text-gray-400 w-28 flex-shrink-0 pt-0.5">
+        {label}
+      </span>
+
+      <span
+        className={`text-sm text-gray-800 font-medium ${
+          mono ? 'font-mono' : ''
+        }`}
+      >
+        {val}
+      </span>
+
     </div>
   )
 }
 
-function DocRow({ doc }: { doc: { name: string; size: string; date: string; version: number } }) {
+// ─────────────────────────────────────────────────────
+// Document Row
+// ─────────────────────────────────────────────────────
+
+function DocRow({
+  doc,
+}: {
+  doc: {
+    name: string
+    size: string
+    date: string
+    version: number
+  }
+}) {
   return (
     <div className="flex items-center gap-3 p-3 rounded-xl border border-gray-100 bg-gray-50 hover:bg-white transition-colors">
-      <span className="text-xl">📄</span>
+
+      <span className="text-xl">
+        📄
+      </span>
+
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-semibold text-gray-900 truncate">{doc.name}</p>
-        <p className="text-xs text-gray-400">Version {doc.version} · {doc.size} · {doc.date}</p>
+
+        <p className="text-sm font-semibold text-gray-900 truncate">
+          {doc.name}
+        </p>
+
+        <p className="text-xs text-gray-400">
+          Version {doc.version} · {doc.size} · {doc.date}
+        </p>
+
       </div>
-      <Btn variant="secondary" size="sm">View</Btn>
+
+      <Btn
+        variant="secondary"
+        size="sm"
+      >
+        View
+      </Btn>
+
     </div>
   )
 }

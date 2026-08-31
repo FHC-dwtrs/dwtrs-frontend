@@ -21,6 +21,13 @@ export interface UserUnit {
   isActive: boolean
 }
 
+export interface UserRoleInfo {
+  roleId: string
+  name: string
+  description: string | null
+  isActive: boolean
+}
+
 export interface User {
   userId: string
   name: string
@@ -29,8 +36,14 @@ export interface User {
   lastLoginAt: string | null
   createdAt: string
   updatedAt: string
-  unit: UserUnit | null
-  roles: UserRole[]
+  unit: {
+    unitId: string
+    name: string
+    unitType: string
+    isActive: boolean
+    parent: { unitId: string; name: string; unitType: string; isActive: boolean } | null
+  } | null
+  role: UserRoleInfo
 }
 
 export interface CreateUserRequest {

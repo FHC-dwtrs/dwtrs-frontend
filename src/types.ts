@@ -77,11 +77,17 @@ export interface OrgUnit {
   delayed: number
 }
 
+export interface AuthUnit {
+  id: string
+  name: string
+  unitType: string
+}
+
 export interface AuthUser {
   userId: string
   name: string
   email: string
-  unit: string | null
-  roles: string[]
+  unit: AuthUnit | null
+  role: string
   permissions: string[]
 }

@@ -12,23 +12,57 @@ import AdminPage from './pages/AdminPage'
 
 type AppView = 'public' | 'login' | 'dashboard'
 
-function mapBackendRole(roles: string[]): Role | null {
-  if (roles.includes('SYSTEM_ADMIN')) return 'admin'
-  if (roles.includes('RECORDS_ARCHIVE_STAFF')) return 'records'
-  if (roles.includes('SECTOR_STAFF')) return 'sector'
-  if (roles.includes('DIRECTORATE_STAFF')) return 'directorate'
-  if (roles.includes('GROUP_STAFF')) return 'group'
+// ============================================================
+// BACKEND ROLE → FRONTEND ROLE
+// ============================================================
 
-  return null
+function mapBackendRole(role: string | undefined): Role | null {
+  if (!role) return null
+
+  switch (role) {
+    case 'SYSTEM_ADMIN':
+      return 'admin'
+
+    case 'RECORDS_ARCHIVE_STAFF':
+      return 'records'
+
+    case 'SECTOR_STAFF':
+      return 'sector'
+
+    case 'DIRECTORATE_STAFF':
+      return 'directorate'
+
+    case 'GROUP_STAFF':
+      return 'group'
+
+    default:
+      return null
+  }
 }
+
+// ============================================================
+// APP
+// ============================================================
 
 export default function App() {
   const [view, setView] = useState<AppView>('public')
   const [authUser, setAuthUser] = useState<AuthUser | null>(null)
   const [page, setPage] = useState('dashboard')
 
-  const role = authUser ? mapBackendRole(authUser.roles) : null
-  const unitName = authUser?.unit ?? ''
+  // ----------------------------------------------------------
+  // Backend now returns ONE role instead of roles[]
+  // ----------------------------------------------------------
+
+  const role = authUser
+    ? mapBackendRole(authUser.role)
+    : null
+
+
+  const unitName = authUser?.unit?.name ?? ''
+
+  // ----------------------------------------------------------
+  // LOGIN
+  // ----------------------------------------------------------
 
   function handleLogin(user: AuthUser) {
     setAuthUser(user)
@@ -36,19 +70,33 @@ export default function App() {
     setPage('dashboard')
   }
 
+  // ----------------------------------------------------------
+  // LOGOUT
+  // ----------------------------------------------------------
+
   function handleLogout() {
     setAuthUser(null)
     setView('public')
     setPage('dashboard')
   }
 
+  // ----------------------------------------------------------
+  // PUBLIC PAGE
+  // ----------------------------------------------------------
+
   if (view === 'public') {
     return (
       <LangProvider>
-        <PublicPage onGoLogin={() => setView('login')} />
+        <PublicPage
+          onGoLogin={() => setView('login')}
+        />
       </LangProvider>
     )
   }
+
+  // ----------------------------------------------------------
+  // LOGIN PAGE
+  // ----------------------------------------------------------
 
   if (view === 'login') {
     return (
@@ -61,13 +109,23 @@ export default function App() {
     )
   }
 
+  // ----------------------------------------------------------
+  // INVALID / UNKNOWN ROLE
+  // ----------------------------------------------------------
+
   if (!role) {
     return (
       <LangProvider>
-        <PublicPage onGoLogin={() => setView('login')} />
+        <PublicPage
+          onGoLogin={() => setView('login')}
+        />
       </LangProvider>
     )
   }
+
+  // ----------------------------------------------------------
+  // AUTHENTICATED APPLICATION
+  // ----------------------------------------------------------
 
   return (
     <LangProvider>
@@ -88,12 +146,20 @@ export default function App() {
           />
 
           <main className="flex-1 overflow-y-auto">
+            {/* ------------------------------------------------ */}
+            {/* RECORDS & ARCHIVE */}
+            {/* ------------------------------------------------ */}
+
             {role === 'records' && (
               <RecordsPage
                 page={page}
                 setPage={setPage}
               />
             )}
+
+            {/* ------------------------------------------------ */}
+            {/* SECTOR */}
+            {/* ------------------------------------------------ */}
 
             {role === 'sector' && (
               <SectorPage
@@ -103,6 +169,10 @@ export default function App() {
               />
             )}
 
+            {/* ------------------------------------------------ */}
+            {/* DIRECTORATE */}
+            {/* ------------------------------------------------ */}
+
             {role === 'directorate' && (
               <DirectoratePage
                 page={page}
@@ -110,12 +180,20 @@ export default function App() {
               />
             )}
 
+            {/* ------------------------------------------------ */}
+            {/* GROUP */}
+            {/* ------------------------------------------------ */}
+
             {role === 'group' && (
               <GroupPage
                 page={page}
                 setPage={setPage}
               />
             )}
+
+            {/* ------------------------------------------------ */}
+            {/* SYSTEM ADMIN */}
+            {/* ------------------------------------------------ */}
 
             {role === 'admin' && (
               <AdminPage

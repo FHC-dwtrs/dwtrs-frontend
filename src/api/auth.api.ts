@@ -18,7 +18,7 @@ export interface LoginResponse {
 export interface MeUser {
   sub: string
   email: string
-  roles: string[]
+  role: string
   unitId: string | null
 }
 
