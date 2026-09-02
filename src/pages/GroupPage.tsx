@@ -1,5 +1,6 @@
-import { useState } from 'react'
-import { CASES } from '../data'
+import { useState, useEffect } from 'react'
+import { getCases, type CaseItem } from '../api/cases.api'
+import { mapCaseToRecord } from '../utils/caseMappers'
 import { StatusBadge, KpiCard, Btn, EmptyState, PriorityBadge } from '../components/ui'
 import { CaseDetail } from './RecordsPage'
 import type { CaseRecord } from '../types'
@@ -15,6 +16,31 @@ export default function GroupPage({ page, setPage }: Props) {
   const [selectedCase, setSelectedCase] = useState<CaseRecord | null>(null)
   const [caseTab, setCaseTab] = useState('Overview')
   const [filterStatus, setFilterStatus] = useState('All')
+  const [cases, setCases] = useState<CaseItem[]>([])
+const [loadingCases, setLoadingCases] = useState(true)
+const [casesError, setCasesError] = useState('')
+
+useEffect(() => {
+  async function loadCases() {
+    try {
+      setLoadingCases(true)
+      setCasesError('')
+
+      const result = await getCases()
+      setCases(result.data ?? [])
+    } catch (err: any) {
+      console.error('Failed to load group cases:', err)
+
+      setCasesError(
+        err.response?.data?.message || 'Failed to load cases.'
+      )
+    } finally {
+      setLoadingCases(false)
+    }
+  }
+
+  loadCases()
+}, [])
 
   function openCase(c: CaseRecord) {
     setSelectedCase(c)
@@ -25,11 +51,26 @@ export default function GroupPage({ page, setPage }: Props) {
   if (page === 'case-detail' && selectedCase) {
     return <CaseDetail c={selectedCase} tab={caseTab} setTab={setCaseTab} onBack={() => setPage('cases')} role="group" />
   }
-
-  const groupCases = CASES.filter(c => c.group === 'Group A1').filter(c => filterStatus === 'All' || c.status === filterStatus)
+  const groupCases = cases
+  .map(mapCaseToRecord)
+  .filter(c => c.group === 'Group A1')
+  .filter(
+    c => filterStatus === 'All' || c.status === filterStatus
+  )
+  //const groupCases = CASES.filter(c => c.group === 'Group A1').filter(c => filterStatus === 'All' || c.status === filterStatus)
 
   if (page === 'remarks') {
-    const allRemarks = CASES.filter(c => c.group === 'Group A1').flatMap(c => c.remarks.map(r => ({ ...r, caseId: c.id, subject: c.subject })))
+    const allRemarks = cases
+  .map(mapCaseToRecord)
+  .filter(c => c.group === 'Group A1')
+  .flatMap(c =>
+    c.remarks.map(r => ({
+      ...r,
+      caseId: c.id,
+      subject: c.subject,
+    }))
+  )
+    //const allRemarks = CASES.filter(c => c.group === 'Group A1').flatMap(c => c.remarks.map(r => ({ ...r, caseId: c.id, subject: c.subject })))
     return (
       <div className="p-6 space-y-4">
         <h2 className="text-xl font-black text-gray-900" style={{ fontFamily: 'var(--font-display)' }}>{t('myRemarks')}</h2>
@@ -52,7 +93,12 @@ export default function GroupPage({ page, setPage }: Props) {
   }
 
   if (page === 'delayed') {
-    const delayed = CASES.filter(c => c.group === 'Group A1' && c.status === 'Delayed')
+    //const delayed = CASES.filter(c => c.group === 'Group A1' && c.status === 'Delayed')
+    const delayed = cases
+  .map(mapCaseToRecord)
+  .filter(
+    c => c.group === 'Group A1' && c.status === 'Delayed'
+  )
     return (
       <div className="p-6 space-y-4">
         <h2 className="text-xl font-black text-gray-900" style={{ fontFamily: 'var(--font-display)' }}>{t('kpi_delayed')}</h2>
@@ -71,7 +117,14 @@ export default function GroupPage({ page, setPage }: Props) {
   }
 
   if (page === 'dashboard') {
-    const needsAction = CASES.filter(c => c.group === 'Group A1' && ['New', 'Returned', 'In Progress'].includes(c.status))
+    const needsAction = cases
+  .map(mapCaseToRecord)
+  .filter(
+    c =>
+      c.group === 'Group A1' &&
+      ['New', 'Returned', 'In Progress'].includes(c.status)
+  )
+    //const needsAction = CASES.filter(c => c.group === 'Group A1' && ['New', 'Returned', 'In Progress'].includes(c.status))
     return (
       <div className="p-6 space-y-6">
         <div>

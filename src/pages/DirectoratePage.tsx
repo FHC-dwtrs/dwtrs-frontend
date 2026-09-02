@@ -1,5 +1,6 @@
-import { useState } from 'react'
-import { CASES } from '../data'
+import { useState, useEffect } from 'react'
+import { getCases, type CaseItem } from '../api/cases.api'
+import { mapCaseToRecord } from '../utils/caseMappers'
 import { StatusBadge, KpiCard, Btn, EmptyState, PriorityBadge } from '../components/ui'
 import { CaseDetail } from './RecordsPage'
 import type { CaseRecord } from '../types'
@@ -25,6 +26,31 @@ export default function DirectoratePage({ page, setPage }: Props) {
   const [selectedCase, setSelectedCase] = useState<CaseRecord | null>(null)
   const [caseTab, setCaseTab] = useState('Overview')
   const [filterStatus, setFilterStatus] = useState('All')
+  const [cases, setCases] = useState<CaseItem[]>([])
+const [loadingCases, setLoadingCases] = useState(true)
+const [casesError, setCasesError] = useState('')
+
+useEffect(() => {
+  async function loadCases() {
+    try {
+      setLoadingCases(true)
+      setCasesError('')
+
+      const result = await getCases()
+      setCases(result.data ?? [])
+    } catch (err: any) {
+      console.error('Failed to load directorate cases:', err)
+
+      setCasesError(
+        err.response?.data?.message || 'Failed to load cases.'
+      )
+    } finally {
+      setLoadingCases(false)
+    }
+  }
+
+  loadCases()
+}, [])
 
   function openCase(c: CaseRecord) {
     setSelectedCase(c)
@@ -35,8 +61,13 @@ export default function DirectoratePage({ page, setPage }: Props) {
   if (page === 'case-detail' && selectedCase) {
     return <CaseDetail c={selectedCase} tab={caseTab} setTab={setCaseTab} onBack={() => setPage('cases')} role="directorate" />
   }
-
-  const dirCases = CASES.filter(c => c.directorate === 'Directorate A').filter(c => filterStatus === 'All' || c.status === filterStatus)
+  const dirCases = cases
+  .map(mapCaseToRecord)
+  .filter(c => c.directorate === 'Directorate A')
+  .filter(
+    c => filterStatus === 'All' || c.status === filterStatus
+  )
+  //const dirCases = CASES.filter(c => c.directorate === 'Directorate A').filter(c => filterStatus === 'All' || c.status === filterStatus)
 
   if (page === 'groups') {
     return (
@@ -112,7 +143,10 @@ export default function DirectoratePage({ page, setPage }: Props) {
               <button onClick={() => setPage('cases')} className="text-xs text-[#1E4B8F] font-semibold hover:underline">{t('viewAll')}</button>
             </div>
             <div className="divide-y divide-gray-50">
-              {CASES.filter(c => c.directorate === 'Directorate A').slice(0, 4).map(c => (
+              {cases
+  .map(mapCaseToRecord)
+  .filter(c => c.directorate === 'Directorate A')
+  .slice(0, 4).map(c => (
                 <div key={c.id} className="flex items-center gap-4 px-6 py-3.5 hover:bg-gray-50 cursor-pointer transition-colors" onClick={() => openCase(c)}>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-0.5">

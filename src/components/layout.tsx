@@ -12,7 +12,9 @@ const NAV: Record<Role, NavItem[]> = {
       { labelKey: 'allCases', icon: '', page: 'cases' },
       { labelKey: 'registeredCases', icon: '', page: 'registered' },
       { labelKey: 'archivedCases', icon: '', page: 'archived' },
+      { labelKey: 'returned', icon: '', page: 'returned' },
     ]},
+    { labelKey: 'returned', icon: '↩️', page: 'returned' }, 
     { labelKey: 'registerNewCase', icon: '➕', page: 'register' },
     { labelKey: 'documents', icon: '📄', page: 'documents' },
     { labelKey: 'archive', icon: '🗃', page: 'archive' },
@@ -23,10 +25,10 @@ const NAV: Record<Role, NavItem[]> = {
     { labelKey: 'cases', icon: '📁', page: 'cases', children: [
       { labelKey: 'allCases', icon: '', page: 'cases' },
       { labelKey: 'incoming', icon: '', page: 'incoming' },
-      { labelKey: 'active', icon: '', page: 'active' },
-      { labelKey: 'pendingDecision', icon: '', page: 'pending' },
+      
+    //  { labelKey: 'pendingDecision', icon: '', page: 'pending' },
       { labelKey: 'transferred', icon: '', page: 'transferred' },
-      { labelKey: 'delayed', icon: '', page: 'delayed' },
+      //{ labelKey: 'delayed', icon: '', page: 'delayed' },
       { labelKey: 'archived', icon: '', page: 'archived' },
       { labelKey: 'waiting', icon: '', page: 'waiting' },
     ]},

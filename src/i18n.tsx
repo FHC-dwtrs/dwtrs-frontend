@@ -371,6 +371,11 @@ const T = {
     sys_backend: 'Backend Services',
     sys_storage: 'File Storage',
     sys_notif: 'Notifications',
+
+      // ... other translations
+  previousHandled: "Previous Handled",
+  noPreviousUnitFound: 'No previous unit found for this case yet.',
+reassign: 'Reassign',
   },
 
   am: {
@@ -740,6 +745,11 @@ const T = {
     sys_backend: 'የበስተጀርባ አገልግሎቶች',
     sys_storage: 'ፋይል ማከማቻ',
     sys_notif: 'ማሳወቂያዎች',
+
+     // ... other translations
+  previousHandled: "ቀደም ሲል የተያዙ",
+  noPreviousUnitFound: 'N.',
+reassign: 'R',
   },
 }
 
@@ -782,3 +792,4 @@ export function LangToggle({ className = '' }: { className?: string }) {
     </button>
   )
 }
+

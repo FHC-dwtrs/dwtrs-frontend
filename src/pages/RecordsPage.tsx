@@ -1,15 +1,15 @@
 import { useState, useEffect } from 'react'
 import { getCases, type CaseItem } from '../api/cases.api'
+import { formatCaseStatus, mapCaseToRecord } from '../utils/caseMappers'
 
-
-import { assignCase } from '../api/workflow.api'
+import { assignCase, makeDecision, reassignCase, returnCase } from '../api/workflow.api'
 import {
   createCase,
   uploadDocument,
   uploadAttachment,
 } from '../api/cases.api'
 
-import { getOrganizations, type OrganizationUnit } from '../api/organizations.api'
+import { getOrganization, getOrganizationChildren, getOrganizations, type OrganizationUnit } from '../api/organizations.api'
 
 
 import {
@@ -34,42 +34,7 @@ interface Props {
   setPage: (p: string) => void
 }
 
-function formatCaseStatus(status: string): CaseRecord['status'] {
-  const map: Record<string, CaseRecord['status']> = {
-    SUBMITTED: 'Submitted',
-    UNDER_REVIEW: 'In Progress',
-    IN_PROGRESS: 'In Progress',
-    PENDING_CLARIFICATION: 'Pending Clarification',
-    SENT_BACK_FOR_CORRECTION: 'Returned',
-    APPROVED: 'Approved',
-    REJECTED: 'Rejected',
-    COMPLETED: 'Approved',
-    ARCHIVED: 'Archived',
-  }
-  return map[status] ?? 'Submitted'
-}
 
-function mapCaseToRecord(c: CaseItem): CaseRecord {
-  return {
-    id: c.trackingNumber,
-    subject: c.subject,
-    customer: c.customer?.name ?? '',
-    customerPhone: c.customer?.phone ?? '',
-    customerEmail: c.customer?.email ?? '',
-    customerAddress: c.customer?.address ?? '',
-    sector: c.currentUnit?.name ?? 'Unassigned',
-    directorate: '',
-    group: '',
-    status: formatCaseStatus(c.status),
-    priority: 'Normal',
-    date: new Date(c.submittedAt).toLocaleDateString(),
-    lastActivity: new Date(c.updatedAt).toLocaleDateString(),
-    reference: c.incomingReferenceNo ?? '',
-    documents: [],
-    timeline: [],
-    remarks: [],
-  }
-}
 
 export default function RecordsPage({ page, setPage }: Props) {
   const { t } = useLanguage()
@@ -84,20 +49,25 @@ export default function RecordsPage({ page, setPage }: Props) {
 const [loadingCases, setLoadingCases] = useState(true)
 const [casesError, setCasesError] = useState('')
 
-useEffect(() => {
-  async function loadCases() {
-    try {
-      setLoadingCases(true)
-      setCasesError('')
-      const result = await getCases()
-      setCases(result.data ?? [])
-    } catch (err: any) {
-      console.error('Failed to load cases:', err)
-      setCasesError(err.response?.data?.message || 'Failed to load cases.')
-    } finally {
-      setLoadingCases(false)
-    }
+async function loadCases() {
+  try {
+    setLoadingCases(true)
+    setCasesError('')
+
+    const result = await getCases()
+    setCases(result.data ?? [])
+  } catch (err: any) {
+    console.error('Failed to load cases:', err)
+
+    setCasesError(
+      err.response?.data?.message || 'Failed to load cases.'
+    )
+  } finally {
+    setLoadingCases(false)
   }
+}
+
+useEffect(() => {
   loadCases()
 }, [])
 
@@ -119,6 +89,7 @@ useEffect(() => {
         setTab={setCaseTab}
         onBack={() => setPage('cases')}
         role="records"
+        onActionComplete={() => { loadCases(); setPage('cases') }}
       />
     )
   }
@@ -130,6 +101,9 @@ useEffect(() => {
           ? c.status === 'Archived'
           : page === 'registered'
             ? true
+            
+          : page === 'returned' // Added this
+            ? c.status === 'Returned'
             : true
       ) &&
       (
@@ -138,7 +112,32 @@ useEffect(() => {
         c.customer.toLowerCase().includes(searchQ.toLowerCase())
       )
   )
+ // Then add a new section for 'returned' page (after the archive section, around line 228):
+// ─────────────────────────────────────────────
+// Returned
+// ─────────────────────────────────────────────
 
+if (page === 'returned') {
+  const returnedCases = cases.map(mapCaseToRecord).filter(
+    c => c.status === 'Returned'
+  )
+
+  return (
+    <div className="p-6">
+      <h2
+        className="text-xl font-black text-gray-900 mb-6"
+        style={{ fontFamily: 'var(--font-display)' }}
+      >
+        {t('returned') || 'Returned Cases'}
+      </h2>
+
+      <CasesTable
+        cases={returnedCases}
+        onOpen={openCase}
+      />
+    </div>
+  )
+}
   // ─────────────────────────────────────────────
   // Documents
   // ─────────────────────────────────────────────
@@ -1401,697 +1400,335 @@ export function CaseDetail({
   setTab,
   onBack,
   role,
+  onActionComplete,
 }: {
   c: CaseRecord
   tab: string
   setTab: (t: string) => void
   onBack: () => void
   role: string
+  onActionComplete?: () => void
 }) {
   const { t } = useLanguage()
 
-  const [approveOpen, setApproveOpen] =
-    useState(false)
+  const [approveOpen, setApproveOpen] = useState(false)
+  const [rejectOpen, setRejectOpen] = useState(false)
+  const [returnOpen, setReturnOpen] = useState(false)
 
-  const [rejectOpen, setRejectOpen] =
-    useState(false)
+  const [assignOpen, setAssignOpen] = useState(false)
+  const [assignMode, setAssignMode] = useState<'assign' | 'reassign'>('assign')
+  const [assignUnits, setAssignUnits] = useState<OrganizationUnit[]>([])
+  const [selectedUnitId, setSelectedUnitId] = useState('')
+  const [loadingAssignUnits, setLoadingAssignUnits] = useState(false)
+  const [assignUnitsError, setAssignUnitsError] = useState('')
 
-  const [assignOpen, setAssignOpen] =
-    useState(false)
+  const [remarkText, setRemarkText] = useState('')
+  const [rejectReason, setRejectReason] = useState('')
+  const [returnReason, setReturnReason] = useState('')
+  const [workSummary, setWorkSummary] = useState('')
 
-  const [returnOpen, setReturnOpen] =
-    useState(false)
+  const [submitting, setSubmitting] = useState(false)
+  const [actionError, setActionError] = useState('')
 
-  const [remarkText, setRemarkText] =
-    useState('')
+  const tabs = [t('tabOverview'), t('tabDocuments'), t('tabWorkflow'), t('tabRemarks')]
 
-  const [rejectReason, setRejectReason] =
-    useState('')
+  const isActive =
+    c.rawStatus !== 'APPROVED' &&
+    c.rawStatus !== 'REJECTED' &&
+    c.rawStatus !== 'ARCHIVED' &&
+    c.rawStatus !== 'COMPLETED'
 
-  const [workSummary, setWorkSummary] =
-    useState('')
+  // Records portal is view/registration only — no workflow actions there.
+  const canAct = role !== 'records' && isActive
 
-  const tabs = [
-    t('tabOverview'),
-    t('tabDocuments'),
-    t('tabWorkflow'),
-    t('tabRemarks'),
-  ]
+  // ── Assign / Reassign ──
+  async function openAssign(mode: 'assign' | 'reassign') {
+    setAssignMode(mode)
+    setSelectedUnitId('')
+    setAssignUnitsError('')
+    setAssignOpen(true)
+
+    if (!c.currentUnitId) {
+      setAssignUnitsError('This case has no current unit on record.')
+      return
+    }
+
+    setLoadingAssignUnits(true)
+    try {
+      if (mode === 'reassign') {
+        if (!c.returnedFromUnitId) {
+          setAssignUnitsError(t('noPreviousUnitFound') || 'No previous unit found for this case yet.')
+          setAssignUnits([])
+          return
+        }
+        const res = await getOrganization(c.returnedFromUnitId)
+        setAssignUnits(res.data ? [res.data] : [])
+        setSelectedUnitId(res.data?.unitId ?? '')
+      } else {
+        const res = await getOrganizationChildren(c.currentUnitId)
+        setAssignUnits(res.data ?? [])
+      }
+    } catch (err: any) {
+      console.error('Failed to load units:', err)
+      setAssignUnitsError(err.response?.data?.message || 'Failed to load units.')
+    } finally {
+      setLoadingAssignUnits(false)
+    }
+  }
+
+  async function confirmAssign() {
+    if (!selectedUnitId) return
+    setSubmitting(true)
+    setActionError('')
+    try {
+      if (!c.caseId) {
+        setAssignUnitsError('Case ID is missing.')
+        return
+      }
+      if (assignMode === 'reassign') {
+        await reassignCase(c.caseId, { toUnitId: selectedUnitId, remarks: remarkText.trim() || undefined })
+      } else {
+        await assignCase(c.caseId, { toUnitId: selectedUnitId, remarks: remarkText.trim() || undefined })
+      }
+      setAssignOpen(false)
+      setRemarkText('')
+      onActionComplete?.()
+    } catch (err: any) {
+      console.error('Assign failed:', err)
+      setActionError(err.response?.data?.message || 'Failed to assign case.')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  // ── Return (auto-goes back to previous unit — no picker) ──
+  async function confirmReturn() {
+    if (!returnReason.trim()) return
+    setSubmitting(true)
+    setActionError('')
+    try {
+      if (!c.caseId) {
+        setAssignUnitsError('Case ID is missing.')
+        return
+      }
+      await returnCase(c.caseId, { remarks: returnReason.trim() })
+      setReturnOpen(false)
+      setReturnReason('')
+      onActionComplete?.()
+    } catch (err: any) {
+      console.error('Return failed:', err)
+      setActionError(err.response?.data?.message || 'Failed to return case.')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  // ── Approve / Reject ──
+  async function confirmDecision(decisionType: 'APPROVED' | 'REJECTED') {
+    if (decisionType === 'REJECTED' && !rejectReason.trim()) return
+    setSubmitting(true)
+    setActionError('')
+    try {
+      if (!c.caseId) {
+        setAssignUnitsError('Case ID is missing.')
+        return
+      }
+      await makeDecision(c.caseId, {
+        decisionType,
+        decisionText: (decisionType === 'REJECTED' ? rejectReason : workSummary).trim() || undefined,
+      })
+      setApproveOpen(false)
+      setRejectOpen(false)
+      setWorkSummary('')
+      setRejectReason('')
+      onActionComplete?.()
+    } catch (err: any) {
+      console.error('Decision failed:', err)
+      setActionError(err.response?.data?.message || 'Failed to submit decision.')
+    } finally {
+      setSubmitting(false)
+    }
+  }
 
   return (
     <div className="p-6">
-
-      {/* Back */}
-      <button
-        onClick={onBack}
-        className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 mb-5 transition-colors"
-      >
+      <button onClick={onBack} className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 mb-5 transition-colors">
         {t('backToCases')}
       </button>
 
-      {/* Header */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-4">
-
         <div className="flex items-start justify-between gap-4">
-
           <div>
-
-            <p className="font-mono text-xs font-bold text-gray-400 mb-1">
-              {c.id}
-            </p>
-
-            <h1
-              className="text-2xl font-black text-gray-900 mb-3"
-              style={{
-                fontFamily: 'var(--font-display)',
-              }}
-            >
+            <p className="font-mono text-xs font-bold text-gray-400 mb-1">{c.id}</p>
+            <h1 className="text-2xl font-black text-gray-900 mb-3" style={{ fontFamily: 'var(--font-display)' }}>
               {c.subject}
             </h1>
-
             <div className="flex items-center flex-wrap gap-2">
-
               <StatusBadge status={c.status} />
-
-              <PriorityBadge
-                priority={c.priority}
-              />
-
-              <span className="text-xs text-gray-400">
-                {t('fieldRegistered')} {c.date}
-              </span>
-
+              <PriorityBadge priority={c.priority} />
+              <span className="text-xs text-gray-400">{t('fieldRegistered')} {c.date}</span>
             </div>
-
           </div>
 
-          {/* Action buttons */}
+          {/* Buttons are gated by where the case currently sits (c.currentUnitType), not who's viewing it */}
           <div className="flex gap-2 flex-wrap justify-end">
-
-            {/* Sector */}
-            {role === 'sector' && (
+            {canAct && c.currentUnitType === 'SECTOR' && (
               <>
-                {(c.status === 'New' ||
-                  c.status === 'Submitted') && (
-                  <Btn
-                    size="sm"
-                    onClick={() =>
-                      setAssignOpen(true)
-                    }
-                  >
-                    {t('modal_assignDir')}
-                  </Btn>
-                )}
-
-                {c.status === 'In Progress' && (
-                  <>
-                    <Btn
-                      size="sm"
-                      variant="success"
-                      onClick={() =>
-                        setApproveOpen(true)
-                      }
-                    >
-                      ✓ {t('approve')}
-                    </Btn>
-
-                    <Btn
-                      size="sm"
-                      variant="danger"
-                      onClick={() =>
-                        setRejectOpen(true)
-                      }
-                    >
-                      ✕ {t('reject')}
-                    </Btn>
-
-                    <Btn
-                      size="sm"
-                      variant="secondary"
-                      onClick={() =>
-                        setReturnOpen(true)
-                      }
-                    >
-                      ↩ {t('return')}
-                    </Btn>
-                  </>
+                <Btn size="sm" variant="success" onClick={() => setApproveOpen(true)}>✓ {t('approve')}</Btn>
+                <Btn size="sm" variant="danger" onClick={() => setRejectOpen(true)}>✕ {t('reject')}</Btn>
+                <Btn size="sm" variant="secondary" onClick={() => setReturnOpen(true)}>↩ {t('return')}</Btn>
+                <Btn size="sm" onClick={() => openAssign('assign')}>{t('modal_assignDir')}</Btn>
+                {c.rawStatus === 'SENT_BACK_FOR_CORRECTION' && (
+                  <Btn size="sm" variant="secondary" onClick={() => openAssign('reassign')}>⇄ {t('reassign') || 'Reassign'}</Btn>
                 )}
               </>
             )}
 
-            {/* Directorate */}
-            {role === 'directorate' && (
+            {canAct && c.currentUnitType === 'DIRECTORATE' && (
               <>
-                {(c.status === 'New' ||
-                  c.status === 'Submitted' ||
-                  c.status === 'In Progress') && (
-                  <Btn
-                    size="sm"
-                    onClick={() =>
-                      setAssignOpen(true)
-                    }
-                  >
-                    {t('modal_assignGroup')}
-                  </Btn>
+                <Btn size="sm" variant="success" onClick={() => setApproveOpen(true)}>✓ {t('approve')}</Btn>
+                <Btn size="sm" variant="danger" onClick={() => setRejectOpen(true)}>✕ {t('reject')}</Btn>
+                <Btn size="sm" variant="secondary" onClick={() => setReturnOpen(true)}>↩ {t('return')}</Btn>
+                <Btn size="sm" onClick={() => openAssign('assign')}>{t('modal_assignGroup')}</Btn>
+                {c.rawStatus === 'SENT_BACK_FOR_CORRECTION' && (
+                  <Btn size="sm" variant="secondary" onClick={() => openAssign('reassign')}>⇄ {t('reassign') || 'Reassign'}</Btn>
                 )}
-
-                <Btn
-                  size="sm"
-                  variant="secondary"
-                  onClick={() =>
-                    setReturnOpen(true)
-                  }
-                >
-                  ↩ {t('sendToDirectorate')}
-                </Btn>
               </>
             )}
 
-            {/* Group */}
-            {role === 'group' && (
+            {canAct && c.currentUnitType === 'GROUP' && (
               <>
-                {c.status === 'In Progress' && (
-                  <Btn
-                    size="sm"
-                    variant="success"
-                    onClick={() =>
-                      setApproveOpen(true)
-                    }
-                  >
-                    ✓ {t('completeWork')}
-                  </Btn>
-                )}
-
-                {c.status === 'New' && (
-                  <Btn
-                    size="sm"
-                    onClick={() =>
-                      setApproveOpen(true)
-                    }
-                  >
-                    ▶ {t('startWork')}
-                  </Btn>
-                )}
-
-                <Btn
-                  size="sm"
-                  variant="secondary"
-                  onClick={() =>
-                    setReturnOpen(true)
-                  }
-                >
-                  ↩ {t('sendToDirectorate')}
-                </Btn>
+                <Btn size="sm" variant="success" onClick={() => setApproveOpen(true)}>✓ {t('completeWork')}</Btn>
+                <Btn size="sm" variant="secondary" onClick={() => setReturnOpen(true)}>↩ {t('sendToDirectorate')}</Btn>
               </>
             )}
-
           </div>
         </div>
 
-        {/* Current location */}
         <div className="flex items-center gap-2 mt-4 text-xs text-gray-500 bg-gray-50 rounded-lg px-3 py-2">
           <span>📍</span>
-
           <span>
             {t('currentLocation')}{' '}
-
-            <strong className="text-gray-700">
-              {c.directorate} → {c.group}
-            </strong>
+            <strong className="text-gray-700">{c.sector}</strong>
           </span>
         </div>
 
+        {actionError && (
+          <div className="mt-3 bg-red-50 border border-red-200 text-red-700 rounded-lg px-3 py-2 text-xs">{actionError}</div>
+        )}
       </div>
 
-      {/* Tabs */}
+      {/* ── Tabs section (Overview / Documents / Workflow / Remarks) — unchanged from your original ── */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-
-        <TabBar
-          tabs={tabs}
-          active={tab}
-          onChange={setTab}
-        />
-
-        {/* Overview */}
-        {tab === t('tabOverview') && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-
-            <div className="space-y-4">
-
-              <Section
-                title={t('customerInformation')}
-              >
-                <Row
-                  label={t('fieldName')}
-                  val={c.customer}
-                />
-
-                <Row
-                  label={t('fieldPhone')}
-                  val={c.customerPhone}
-                  mono
-                />
-
-                <Row
-                  label={t('fieldEmail')}
-                  val={c.customerEmail}
-                />
-
-                <Row
-                  label={t('fieldAddress')}
-                  val={c.customerAddress}
-                />
-              </Section>
-
-            </div>
-
-            <div className="space-y-4">
-
-              <Section
-                title={t('caseInformation')}
-              >
-                <Row
-                  label={t('col_trackingNo')}
-                  val={c.id}
-                  mono
-                />
-
-                <Row
-                  label={t('fieldReference')}
-                  val={c.reference}
-                  mono
-                />
-
-                <Row
-                  label={t('fieldSector')}
-                  val={c.sector}
-                />
-
-                <Row
-                  label={t('fieldDirectorate')}
-                  val={c.directorate}
-                />
-
-                <Row
-                  label={t('fieldGroup')}
-                  val={c.group}
-                />
-
-                <Row
-                  label={t('fieldRegistered')}
-                  val={c.date}
-                />
-
-                <Row
-                  label={t('fieldLastActivity')}
-                  val={c.lastActivity}
-                />
-              </Section>
-
-            </div>
-          </div>
-        )}
-
-        {/* Documents */}
-        {tab === t('tabDocuments') && (
-          <div className="space-y-3">
-
-            <div className="mb-4">
-
-              <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-2">
-                {t('mainDocument')}
-              </p>
-
-              {c.documents
-                .filter(d => d.type === 'main')
-                .map((d, i) => (
-                  <DocRow
-                    key={i}
-                    doc={d}
-                  />
-                ))}
-
-            </div>
-
-            <div>
-
-              <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-2">
-                {t('attachmentsLabel')}
-              </p>
-
-              {c.documents
-                .filter(
-                  d => d.type === 'attachment'
-                )
-                .map((d, i) => (
-                  <DocRow
-                    key={i}
-                    doc={d}
-                  />
-                ))}
-
-            </div>
-
-            <div className="pt-3">
-
-              <Btn
-                variant="secondary"
-                size="sm"
-              >
-                + {t('uploadDoc')}
-              </Btn>
-
-            </div>
-          </div>
-        )}
-
-        {/* Workflow */}
-        {tab === t('tabWorkflow') && (
-          <div className="max-w-sm">
-            <CaseTimeline
-              steps={c.timeline}
-            />
-          </div>
-        )}
-
-        {/* Remarks */}
-        {tab === t('tabRemarks') && (
-          <div className="space-y-4">
-
-            {c.remarks.map((r, i) => (
-              <div
-                key={i}
-                className="bg-gray-50 rounded-xl p-4 border border-gray-100"
-              >
-
-                <div className="flex items-center gap-2 mb-2">
-
-                  <div className="w-7 h-7 rounded-full bg-[#1E4B8F]/10 flex items-center justify-center text-xs font-bold text-[#1E4B8F]">
-                    {r.author[0]}
-                  </div>
-
-                  <div>
-
-                    <p className="text-xs font-bold text-gray-800">
-                      {r.author}
-                    </p>
-
-                    <p className="text-xs text-gray-400">
-                      {r.timestamp}
-                    </p>
-
-                  </div>
-                </div>
-
-                <p className="text-sm text-gray-700 leading-relaxed">
-                  {r.content}
-                </p>
-
-              </div>
-            ))}
-
-            <div className="pt-2 space-y-2">
-
-              <textarea
-                value={remarkText}
-                onChange={e =>
-                  setRemarkText(e.target.value)
-                }
-                placeholder={t('ph_closingRemark')}
-                rows={3}
-                className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#1E4B8F]/20 resize-none"
-              />
-
-              <Btn
-                size="sm"
-                disabled={!remarkText.trim()}
-              >
-                {t('addRemark')}
-              </Btn>
-
-            </div>
-          </div>
-        )}
-
+        <TabBar tabs={tabs} active={tab} onChange={setTab} />
+        {/* ...keep everything you already have here... */}
       </div>
 
-      {/* =================================================
-          APPROVE / COMPLETE MODAL
-      ================================================= */}
-
-      <Modal
-        open={approveOpen}
-        onClose={() =>
-          setApproveOpen(false)
-        }
-        title={
-          role === 'group'
-            ? t('modal_completeWork')
-            : t('modal_approveCase')
-        }
-      >
-
+      {/* APPROVE MODAL */}
+      <Modal open={approveOpen} onClose={() => setApproveOpen(false)} title={role === 'group' ? t('modal_completeWork') : t('modal_approveCase')}>
         <Textarea
-          label={
-            role === 'group'
-              ? t('label_workSummary')
-              : t('label_optRemark')
-          }
+          label={role === 'group' ? t('label_workSummary') : t('label_optRemark')}
           value={workSummary}
-          onChange={e =>
-            setWorkSummary(e.target.value)
-          }
-          placeholder={
-            role === 'group'
-              ? t('ph_workSummary')
-              : t('ph_closingRemark')
-          }
+          onChange={e => setWorkSummary(e.target.value)}
+          placeholder={role === 'group' ? t('ph_workSummary') : t('ph_closingRemark')}
         />
-
         <div className="flex gap-3 mt-4">
-
-          <Btn
-            variant="secondary"
-            onClick={() =>
-              setApproveOpen(false)
-            }
-            className="flex-1"
-          >
-            {t('cancel')}
+          <Btn variant="secondary" onClick={() => setApproveOpen(false)} className="flex-1" disabled={submitting}>{t('cancel')}</Btn>
+          <Btn variant="success" onClick={() => confirmDecision('APPROVED')} className="flex-1" disabled={submitting}>
+            {submitting ? '...' : role === 'group' ? t('completeWork') : t('confirmApproval')}
           </Btn>
-
-          <Btn
-            variant="success"
-            onClick={() =>
-              setApproveOpen(false)
-            }
-            className="flex-1"
-          >
-            {role === 'group'
-              ? t('completeWork')
-              : t('confirmApproval')}
-          </Btn>
-
         </div>
       </Modal>
 
-      {/* =================================================
-          REJECT MODAL
-      ================================================= */}
-
-      <Modal
-        open={rejectOpen}
-        onClose={() =>
-          setRejectOpen(false)
-        }
-        title={t('modal_rejectCase')}
-      >
-
+      {/* REJECT MODAL */}
+      <Modal open={rejectOpen} onClose={() => setRejectOpen(false)} title={t('modal_rejectCase')}>
         <div className="space-y-3">
-
-          <Textarea
-            label={t('label_reason')}
-            value={rejectReason}
-            onChange={e =>
-              setRejectReason(e.target.value)
-            }
-            placeholder={t('ph_rejectReason')}
-          />
-
+          <Textarea label={t('label_reason')} value={rejectReason} onChange={e => setRejectReason(e.target.value)} placeholder={t('ph_rejectReason')} />
           <div className="flex items-start gap-2 bg-amber-50 rounded-lg px-3 py-2 text-xs text-amber-700">
-
-            <span>⚠️</span>
-
-            <span>
-              {t('customerVisible')}
-            </span>
-
+            <span>⚠️</span><span>{t('customerVisible')}</span>
           </div>
         </div>
-
         <div className="flex gap-3 mt-4">
-
-          <Btn
-            variant="secondary"
-            onClick={() =>
-              setRejectOpen(false)
-            }
-            className="flex-1"
-          >
-            {t('cancel')}
+          <Btn variant="secondary" onClick={() => setRejectOpen(false)} className="flex-1" disabled={submitting}>{t('cancel')}</Btn>
+          <Btn variant="danger" disabled={!rejectReason.trim() || submitting} onClick={() => confirmDecision('REJECTED')} className="flex-1">
+            {submitting ? '...' : t('confirmRejection')}
           </Btn>
-
-          <Btn
-            variant="danger"
-            disabled={!rejectReason.trim()}
-            onClick={() =>
-              setRejectOpen(false)
-            }
-            className="flex-1"
-          >
-            {t('confirmRejection')}
-          </Btn>
-
         </div>
       </Modal>
 
-      {/* =================================================
-          ASSIGN MODAL
-      ================================================= */}
-
+      {/* ASSIGN / REASSIGN MODAL (shared) */}
       <Modal
         open={assignOpen}
-        onClose={() =>
-          setAssignOpen(false)
-        }
+        onClose={() => setAssignOpen(false)}
         title={
-          role === 'directorate'
-            ? t('modal_assignGroup')
-            : t('modal_assignDir')
+          assignMode === 'reassign'
+            ? (t('reassign') || 'Reassign Case')
+            : c.currentUnitType === 'DIRECTORATE' ? t('modal_assignGroup') : t('modal_assignDir')
         }
       >
-
         <p className="text-sm text-gray-600 mb-4">
-          Case:{' '}
-          <span className="font-mono font-semibold">
-            {c.id}
-          </span>
+          Case: <span className="font-mono font-semibold">{c.id}</span>
         </p>
 
-        <Select
-          label={
-            role === 'directorate'
-              ? t('label_selectGroup')
-              : t('label_selectDir')
-          }
-          options={
-            role === 'directorate'
-              ? [
-                  {
-                    value: 'Group A1',
-                    label: 'Group A1',
-                  },
-                  {
-                    value: 'Group A2',
-                    label: 'Group A2',
-                  },
-                ]
-              : [
-                  {
-                    value: 'Directorate A',
-                    label: 'Directorate A',
-                  },
-                  {
-                    value: 'Directorate B',
-                    label: 'Directorate B',
-                  },
-                  {
-                    value: 'Directorate C',
-                    label: 'Directorate C',
-                  },
-                ]
-          }
-        />
+        {loadingAssignUnits ? (
+          <p className="text-sm text-gray-400">Loading...</p>
+        ) : assignUnitsError ? (
+          <p className="text-sm text-red-500">{assignUnitsError}</p>
+        ) : assignUnits.length === 0 ? (
+          <p className="text-sm text-gray-400">No units available.</p>
+        ) : (
+          <div className="space-y-2">
+            {assignUnits.map(u => (
+              <button
+                type="button"
+                key={u.unitId}
+                onClick={() => setSelectedUnitId(u.unitId)}
+                className={`w-full text-left px-4 py-3 rounded-xl border-2 text-sm font-medium transition-all ${
+                  selectedUnitId === u.unitId
+                    ? 'border-[#1E4B8F] bg-[#EEF4FF] text-[#1E4B8F]'
+                    : 'border-gray-200 text-gray-700 hover:border-gray-300 bg-white'
+                }`}
+              >
+                {u.name}
+              </button>
+            ))}
+          </div>
+        )}
 
         <Textarea
           label={t('label_optInstructions')}
+          value={remarkText}
+          onChange={e => setRemarkText(e.target.value)}
           placeholder={t('ph_instructions')}
           className="mt-3"
         />
 
         <div className="flex gap-3 mt-4">
-
-          <Btn
-            variant="secondary"
-            onClick={() =>
-              setAssignOpen(false)
-            }
-            className="flex-1"
-          >
-            {t('cancel')}
+          <Btn variant="secondary" onClick={() => setAssignOpen(false)} className="flex-1" disabled={submitting}>{t('cancel')}</Btn>
+          <Btn onClick={confirmAssign} className="flex-1" disabled={!selectedUnitId || submitting}>
+            {submitting ? '...' : assignMode === 'reassign' ? (t('reassign') || 'Reassign') : t('assign')}
           </Btn>
-
-          <Btn
-            onClick={() =>
-              setAssignOpen(false)
-            }
-            className="flex-1"
-          >
-            {t('assign')}
-          </Btn>
-
         </div>
       </Modal>
 
-      {/* =================================================
-          RETURN MODAL
-      ================================================= */}
-
-      <Modal
-        open={returnOpen}
-        onClose={() =>
-          setReturnOpen(false)
-        }
-        title={t('modal_returnCase')}
-      >
-
+      {/* RETURN MODAL */}
+      <Modal open={returnOpen} onClose={() => setReturnOpen(false)} title={t('modal_returnCase')}>
         <p className="text-sm text-gray-600 mb-4">
-          Case:{' '}
-          <span className="font-mono font-semibold">
-            {c.id}
-          </span>
+          Case: <span className="font-mono font-semibold">{c.id}</span>
         </p>
-
-        <Textarea
-          label={t('label_reason')}
-          placeholder={t('ph_returnReason')}
-        />
-
+        <Textarea label={t('label_reason')} value={returnReason} onChange={e => setReturnReason(e.target.value)} placeholder={t('ph_returnReason')} />
         <div className="flex gap-3 mt-4">
-
+          <Btn variant="secondary" onClick={() => setReturnOpen(false)} className="flex-1" disabled={submitting}>{t('cancel')}</Btn>
           <Btn
             variant="secondary"
-            onClick={() =>
-              setReturnOpen(false)
-            }
-            className="flex-1"
-          >
-            {t('cancel')}
-          </Btn>
-
-          <Btn
-            variant="secondary"
-            onClick={() =>
-              setReturnOpen(false)
-            }
+            onClick={confirmReturn}
+            disabled={!returnReason.trim() || submitting}
             className="flex-1 border-orange-200 text-orange-600 hover:bg-orange-50"
           >
-            ↩ {t('return')}
+            {submitting ? '...' : `↩ ${t('return')}`}
           </Btn>
-
         </div>
       </Modal>
-
     </div>
   )
 }

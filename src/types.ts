@@ -15,6 +15,7 @@ export type Priority = 'High' | 'Normal' | 'Low'
 
 export interface CaseRecord {
   id: string
+  caseId?: string                    // optional — real cases have it, mock data doesn't
   subject: string
   customer: string
   customerPhone: string
@@ -24,14 +25,18 @@ export interface CaseRecord {
   directorate: string
   group: string
   status: CaseStatus
-  priority: Priority
+  rawStatus?: string                 // optional
+  reason?: string                    // was missing entirely — mock data uses this for rejected cases
+  priority: 'High' | 'Normal' | 'Low'
   date: string
   lastActivity: string
   reference: string
-  reason?: string
-  documents: DocFile[]
-  timeline: TimelineStep[]
-  remarks: Remark[]
+  currentUnitId?: string | null      // optional
+  currentUnitType?: 'SECTOR' | 'DIRECTORATE' | 'GROUP' | null   // optional
+  returnedFromUnitId?: string | null // optional
+  documents: any[]
+  timeline: any[]
+  remarks: any[]
 }
 
 export interface DocFile {

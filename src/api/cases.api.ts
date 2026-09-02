@@ -83,20 +83,26 @@ export type CaseStatus =
   | 'COMPLETED'
   | 'ARCHIVED'
 
-export interface CaseItem {
-  caseId: string
-  customerId: string
-  trackingNumber: string
-  incomingReferenceNo: string | null
-  subject: string
-  status: CaseStatus
-  currentUnitId: string | null
-  version: number
-  submittedAt: string
-  updatedAt: string
-  customer: CaseCustomer
-  currentUnit: CaseUnit | null
-}
+  export interface CaseItem {
+    caseId: string
+    customerId: string
+    trackingNumber: string
+    incomingReferenceNo: string | null
+    subject: string
+    status: CaseStatus
+    currentUnitId: string | null
+  
+    isArchived: boolean
+    archivedAt: string | null
+    archivedBy: string | null
+  
+    version: number
+    submittedAt: string
+    updatedAt: string
+  
+    customer: CaseCustomer
+    currentUnit: CaseUnit | null
+  }
 
 export interface GetCasesResponse {
   success: boolean
@@ -163,6 +169,22 @@ export const uploadAttachment = async (
   const response = await apiClient.post<UploadAttachmentResponse>(
     `/cases/${caseId}/documents/${documentId}/attachments`,
     formData
+  )
+
+  return response.data
+}
+
+export interface ToggleArchivePayload {
+  archived: boolean
+}
+
+export async function toggleCaseArchive(
+  caseId: string,
+  payload: ToggleArchivePayload
+): Promise<GetCaseResponse> {
+  const response = await apiClient.patch<GetCaseResponse>(
+    `/cases/${caseId}/archive`,
+    payload
   )
 
   return response.data

@@ -1,10 +1,36 @@
 import apiClient from "./client"
 
+export interface WorkflowActionResponse {
+    success: boolean
+    message: string
+    data: unknown
+  }
 
 export interface AssignCasePayload {
   toUnitId: string
   remarks?: string
 }
+
+export interface ReturnCasePayload {
+    remarks: string
+  }
+  
+  export interface TransferCasePayload {
+    toUnitId: string
+    remarks?: string
+  }
+  
+  export interface ReassignCasePayload {
+    toUnitId: string
+    remarks?: string
+  }
+  
+  export type DecisionType = 'APPROVED' | 'REJECTED'
+
+  export interface DecisionPayload {
+    decisionType: DecisionType
+    decisionText?: string
+  }
 
 export interface AssignCaseResponse {
   success: boolean
@@ -40,3 +66,48 @@ export const assignCase = async (
 
   return response.data
 }
+
+export async function returnCase(
+    caseId: string,
+    payload: ReturnCasePayload
+  ): Promise<WorkflowActionResponse> {
+    const response = await apiClient.post<WorkflowActionResponse>(
+      `/workflow/cases/${caseId}/return`,
+      payload
+    )
+    return response.data
+  }
+  
+  export async function transferCase(
+    caseId: string,
+    payload: TransferCasePayload
+  ): Promise<WorkflowActionResponse> {
+    const response = await apiClient.post<WorkflowActionResponse>(
+      `/workflow/cases/${caseId}/transfer`,
+      payload
+    )
+    return response.data
+  }
+  
+
+  export async function reassignCase(
+    caseId: string,
+    payload: ReassignCasePayload
+  ): Promise<WorkflowActionResponse> {
+    const response = await apiClient.post<WorkflowActionResponse>(
+      `/workflow/cases/${caseId}/reassign`,
+      payload
+    )
+    return response.data
+  }
+  
+  export async function makeDecision(
+    caseId: string,
+    payload: DecisionPayload
+  ): Promise<WorkflowActionResponse> {
+    const response = await apiClient.post<WorkflowActionResponse>(
+      `/workflow/cases/${caseId}/decision`,
+      payload
+    )
+    return response.data
+  }

@@ -166,6 +166,7 @@ export default function App() {
                 page={page}
                 setPage={setPage}
                 sectorName={unitName}
+                sectorUnitId={authUser?.unit?.id ?? ''}
               />
             )}
 
