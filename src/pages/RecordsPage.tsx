@@ -1598,7 +1598,7 @@ export function CaseDetail({
 
             {canAct && c.currentUnitType === 'GROUP' && (
               <>
-                <Btn size="sm" variant="success" onClick={() => setApproveOpen(true)}>✓ {t('completeWork')}</Btn>
+                {/*<Btn size="sm" variant="success" onClick={() => setApproveOpen(true)}>✓ {t('completeWork')}</Btn>*/}
                 <Btn size="sm" variant="secondary" onClick={() => setReturnOpen(true)}>↩ {t('sendToDirectorate')}</Btn>
               </>
             )}
