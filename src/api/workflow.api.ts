@@ -27,10 +27,16 @@ export interface ReturnCasePayload {
   
   export type DecisionType = 'APPROVED' | 'REJECTED'
 
-  export interface DecisionPayload {
+  /*export interface DecisionPayload {
     decisionType: DecisionType
     decisionText?: string
-  }
+
+  }*/
+    export interface DecisionPayload {
+      decisionType: 'APPROVED' | 'REJECTED'
+      decisionText?: string
+      archiveAfterApproval?: boolean // Add this
+    }
 
 export interface AssignCaseResponse {
   success: boolean
@@ -108,6 +114,24 @@ export async function returnCase(
     const response = await apiClient.post<WorkflowActionResponse>(
       `/workflow/cases/${caseId}/decision`,
       payload
+    )
+    return response.data
+  }
+
+  export async function getCaseHistory(
+    caseId: string
+  ): Promise<WorkflowActionResponse> {
+    const response = await apiClient.get<WorkflowActionResponse>(
+      `/workflow/cases/${caseId}/history`
+    )
+    return response.data
+  }
+  
+  export async function getCaseRemarks(
+    caseId: string
+  ): Promise<WorkflowActionResponse> {
+    const response = await apiClient.get<WorkflowActionResponse>(
+      `/workflow/cases/${caseId}/remarks`
     )
     return response.data
   }

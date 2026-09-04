@@ -1,7 +1,9 @@
 import type { CaseItem } from '../api/cases.api'
 import type { CaseRecord, CaseStatus } from '../types'
 
-export function formatCaseStatus(status: string): CaseStatus {
+export function formatCaseStatus(status: string, isArchived?: boolean): CaseStatus {
+  if (isArchived) return 'Archived'
+
   const map: Record<string, CaseStatus> = {
     SUBMITTED: 'Submitted',
     UNDER_REVIEW: 'In Progress',
@@ -28,8 +30,11 @@ export function mapCaseToRecord(c: CaseItem): CaseRecord {
     sector: c.currentUnit?.name ?? 'Unassigned',
     directorate: '',
     group: '',
-    status: formatCaseStatus(c.status),
+    status: formatCaseStatus(c.status, c.isArchived),
     rawStatus: c.status,
+
+    isArchived: c.isArchived,
+    
     priority: 'Normal',
     date: new Date(c.submittedAt).toLocaleDateString(),
     lastActivity: new Date(c.updatedAt).toLocaleDateString(),

@@ -53,8 +53,10 @@ export default function DirectoratePage({ page, setPage, directorateName, direct
 
   // Cases currently sitting at THIS directorate
   //const dirCases = allCases.filter(c => c.currentUnit?.unitId === directorateUnitId)
-
-  const dirCases = allCases
+  const dirCases = allCases.filter(
+    c => c.currentUnit?.unitId === directorateUnitId
+  )
+  //const dirCases = allCases
   useEffect(() => {
     async function loadGroups() {
       try {

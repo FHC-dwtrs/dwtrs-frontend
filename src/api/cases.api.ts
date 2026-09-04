@@ -114,6 +114,17 @@ export interface GetCaseResponse {
   data: CaseItem
 }
 
+export interface UpdateCaseInput {
+  customer?: {
+    name?: string
+    phone?: string
+    email?: string
+    address?: string
+  }
+  incomingReferenceNo?: string
+  subject?: string
+}
+
 export const getCases = async (): Promise<GetCasesResponse> => {
   const response = await apiClient.get<GetCasesResponse>('/cases')
   return response.data
@@ -178,13 +189,31 @@ export interface ToggleArchivePayload {
   archived: boolean
 }
 
-export async function toggleCaseArchive(
+export interface ToggleCaseArchiveResponse {
+  success: boolean
+  message: string
+  data: CaseItem
+}
+
+export const toggleCaseArchive = async (
   caseId: string,
-  payload: ToggleArchivePayload
-): Promise<GetCaseResponse> {
-  const response = await apiClient.patch<GetCaseResponse>(
+  archived: boolean
+): Promise<ToggleCaseArchiveResponse> => {
+  const response = await apiClient.patch<ToggleCaseArchiveResponse>(
     `/cases/${caseId}/archive`,
-    payload
+    { archived }
+  )
+
+  return response.data
+}
+
+export const updateCase = async (
+  caseId: string,
+  data: UpdateCaseInput
+): Promise<GetCaseResponse> => {
+  const response = await apiClient.patch<GetCaseResponse>(
+    `/cases/${caseId}`,
+    data
   )
 
   return response.data

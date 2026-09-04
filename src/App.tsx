@@ -178,6 +178,9 @@ export default function App() {
               <DirectoratePage
                 page={page}
                 setPage={setPage}
+                directorateName={unitName}
+                directorateUnitId={authUser?.unit?.id ?? ''}
+
               />
             )}
 

@@ -37,6 +37,7 @@ export interface CaseRecord {
   documents: any[]
   timeline: any[]
   remarks: any[]
+  isArchived: boolean
 }
 
 export interface DocFile {
@@ -95,4 +96,39 @@ export interface AuthUser {
   unit: AuthUnit | null
   role: string
   permissions: string[]
+}
+
+export interface CaseHistoryEntryBase {
+  timestamp: string
+  by: { userId: string; name: string; email: string }
+}
+
+export interface AssignmentEntry extends CaseHistoryEntryBase {
+  type: 'ASSIGNMENT'
+  assignmentId: string
+  fromUnit: string | null
+  toUnit: string
+  remarks: string | null
+  assignmentStatus: 'ACTIVE' | 'COMPLETED' | 'CANCELLED'
+}
+
+export interface StatusChangeEntry extends CaseHistoryEntryBase {
+  type: 'STATUS_CHANGE'
+  status: string
+}
+
+export interface DecisionEntry extends CaseHistoryEntryBase {
+  type: 'DECISION'
+  decisionType: 'APPROVED' | 'REJECTED'
+  decisionText: string | null
+}
+
+export type CaseHistoryEntry = AssignmentEntry | StatusChangeEntry | DecisionEntry
+
+export interface CaseRemarkItem {
+  remarkId: string
+  remarkText: string
+  createdAt: string
+  by: { userId: string; name: string; email: string }
+  context: string | null
 }

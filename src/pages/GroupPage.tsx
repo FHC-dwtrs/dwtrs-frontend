@@ -44,6 +44,10 @@ export default function GroupPage({ page, setPage }: Props) {
       setCases(result.data ?? [])
     } catch (err: any) {
       console.error('Failed to load group cases:', err)
+      console.error('Failed to load group cases:', err)
+  console.error('Status:', err.response?.status)
+  console.error('Response:', err.response?.data)
+  console.error('URL:', err.config?.url)
 
       setCasesError(
         err.response?.data?.message || 'Failed to load cases.'

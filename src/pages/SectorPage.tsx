@@ -3,10 +3,13 @@ import { StatusBadge, KpiCard, Btn, BarChart, TabBar, EmptyState, PriorityBadge,
 import { CaseDetail } from './RecordsPage'
 import type { CaseRecord, CaseStatus } from '../types'
 import { useLanguage } from '../i18n'
-import { getCases, type CaseItem } from '../api/cases.api'
 import { getOrganizations, type OrganizationUnit } from '../api/organizations.api'
 import { formatCaseStatus, mapCaseToRecord } from '../utils/caseMappers'
-
+import {
+  getCases,
+  toggleCaseArchive,
+  type CaseItem,
+} from '../api/cases.api'
 interface Props {
   page: string
   setPage: (p: string) => void
@@ -27,7 +30,8 @@ export default function SectorPage({ page, setPage, sectorName, sectorUnitId }: 
 
   const [selectedCase, setSelectedCase] = useState<CaseRecord | null>(null)
   const [caseTab, setCaseTab] = useState('Overview')
-  const [filterStatus, setFilterStatus] = useState('All')
+  //const [filterStatus, setFilterStatus] = useState('All')
+  const [filterStatus, setFilterStatus] = useState('ALL')
   const [searchQ, setSearchQ] = useState('')
 
   const [allCases, setAllCases] = useState<CaseItem[]>([])
@@ -56,6 +60,25 @@ export default function SectorPage({ page, setPage, sectorName, sectorUnitId }: 
   useEffect(() => {
     loadCases()
   }, [])
+
+  const [archiveError, setArchiveError] = useState('')
+  async function handleArchive(caseId: string, archived: boolean) {
+    try {
+      await toggleCaseArchive(caseId, archived)
+  
+      await loadCases()
+  
+      setSelectedCase(null)
+      setPage(archived ? 'archived' : 'cases')
+    } catch (err: any) {
+      console.error('Failed to update archive status:', err)
+  
+      setCasesError(
+        err.response?.data?.message ||
+        'Failed to update case archive status.'
+      )
+    }
+  }
 
   useEffect(() => {
     async function loadDirectorates() {
@@ -111,14 +134,13 @@ export default function SectorPage({ page, setPage, sectorName, sectorUnitId }: 
   }, [sectorUnitId, allCases])
 
   // Cases currently sitting at THIS sector
-  //const myCases = allCases
   const myCases = allCases.filter(
     c => c.currentUnit?.unitId === sectorUnitId
   )
 
-  const needsAssignment = myCases.filter(c => c.status === 'SUBMITTED')
   const awaitingDecision = myCases.filter(c => c.status === 'UNDER_REVIEW')
-  const decided = myCases.filter(c => c.status === 'APPROVED' || c.status === 'REJECTED')
+  const approvedCases = myCases.filter(c => c.status === 'APPROVED')
+  const rejectedCases = myCases.filter(c => c.status === 'REJECTED')
   const archivedCases = myCases.filter(c => c.isArchived)
 
   function openCase(c: CaseRecord) {
@@ -129,32 +151,52 @@ export default function SectorPage({ page, setPage, sectorName, sectorUnitId }: 
 
   if (page === 'case-detail' && selectedCase) {
     return (
-      <CaseDetail
-        c={selectedCase}
-        tab={caseTab}
-        setTab={setCaseTab}
-        onBack={() => { setSelectedCase(null); setPage('cases') }}
-        role="sector"
-        onActionComplete={() => { loadCases(); setSelectedCase(null); setPage('cases') }}
-      />
+      <CaseDetail 
+  c={selectedCase} 
+  tab={caseTab} 
+  setTab={setCaseTab} 
+  onBack={() => {
+    setSelectedCase(null)
+    setPage('cases')
+  }}
+  role="sector"
+  onActionComplete={() => {
+    loadCases()
+    setSelectedCase(null)
+    setPage('cases')
+  }}
+  onArchive={(archived) => handleArchive(selectedCase.id, archived)}
+/>
     )
   }
 
-  const statuses = ['All', 'Submitted', 'In Progress', 'Pending Clarification', 'Returned', 'Approved', 'Rejected', 'Archived']
+  const STATUS_FILTERS = [
+    { label: 'All', value: 'ALL' },
+    { label: 'Submitted', value: 'SUBMITTED' },
+    { label: 'In Progress', value: 'IN_PROGRESS' },
+    { label: 'Pending Clarification', value: 'PENDING_CLARIFICATION' },
+    { label: 'Returned', value: 'SENT_BACK_FOR_CORRECTION' },
+    { label: 'Approved', value: 'APPROVED' },
+    { label: 'Rejected', value: 'REJECTED' },
+    { label: 'Archived', value: 'ARCHIVED' },
+  ]
+ // const statuses = ['All', 'Submitted', 'In Progress', 'Pending Clarification', 'Returned', 'Approved', 'Rejected', 'Archived']
 
-  const filtered = myCases
-    .filter(c =>
-      page === 'archived'
-        ? c.isArchived
-        : !c.isArchived
-    )
-    .filter(c => {
-      const displayStatus = formatCaseStatus(c.status)
-      return (filterStatus === 'All' || displayStatus === filterStatus) &&
-        (c.subject.toLowerCase().includes(searchQ.toLowerCase()) ||
-         c.trackingNumber.toLowerCase().includes(searchQ.toLowerCase()))
-    })
-    .map(mapCaseToRecord)
+ const filtered = myCases
+ .filter(c =>
+   page === 'archived'
+     ? c.isArchived
+     : !c.isArchived
+ )
+ .filter(c =>
+   filterStatus === 'ALL' ||
+   c.status === filterStatus
+ )
+ .filter(c =>
+   c.subject.toLowerCase().includes(searchQ.toLowerCase()) ||
+   c.trackingNumber.toLowerCase().includes(searchQ.toLowerCase())
+ )
+ .map(mapCaseToRecord)
 
   if (page === 'reports') {
     return (
@@ -177,10 +219,15 @@ export default function SectorPage({ page, setPage, sectorName, sectorUnitId }: 
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           <KpiCard label={t('kpi_totalCases')} value={myCases.length} icon="📥" accent="#2563EB" />
           <KpiCard
-            label="Needs Assignment"
-            value={needsAssignment.length}
-            icon="🔄"
-            onClick={() => setPage('cases')}
+            label="Rejected Cases"
+            value={rejectedCases.length}
+            icon="❌"
+            accent="#DC2626"
+            onClick={() => {
+              setFilterStatus('Rejected')
+              setPage('cases')
+            }}
+            sub={rejectedCases.length > 0 ? 'Needs review' : 'None rejected'}
           />
           <KpiCard
             label={t('kpi_awaitingDecision')}
@@ -190,7 +237,7 @@ export default function SectorPage({ page, setPage, sectorName, sectorUnitId }: 
             onClick={() => setPage('cases')}
             sub={awaitingDecision.length > 0 ? t('kpi_actionRequired') : t('kpi_allResolved')}
           />
-          <KpiCard label={t('kpi_approved')} value={decided.filter(c => c.status === 'APPROVED').length} icon="✅" accent="#16A34A" />
+          <KpiCard label={t('kpi_approved')} value={approvedCases.length} icon="✅" accent="#16A34A" />
         </div>
 
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100">
@@ -199,7 +246,7 @@ export default function SectorPage({ page, setPage, sectorName, sectorUnitId }: 
             <button onClick={() => setPage('cases')} className="text-xs text-[#1E4B8F] font-semibold hover:underline">{t('viewAll')}</button>
           </div>
           <div className="divide-y divide-gray-50">
-            {[...needsAssignment, ...awaitingDecision].slice(0, 5).map(c => (
+            {awaitingDecision.slice(0, 5).map(c => (
               <div key={c.caseId} className="flex items-center gap-4 px-6 py-3.5 hover:bg-gray-50 cursor-pointer transition-colors" onClick={() => openCase(mapCaseToRecord(c))}>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
@@ -211,7 +258,7 @@ export default function SectorPage({ page, setPage, sectorName, sectorUnitId }: 
                 <Btn size="sm" onClick={() => openCase(mapCaseToRecord(c))}>{t('review')}</Btn>
               </div>
             ))}
-            {needsAssignment.length === 0 && awaitingDecision.length === 0 && (
+            {awaitingDecision.length === 0 && (
               <div className="px-6 py-8 text-center text-sm text-gray-400">No cases need action right now.</div>
             )}
           </div>
@@ -306,12 +353,19 @@ export default function SectorPage({ page, setPage, sectorName, sectorUnitId }: 
       </div>
 
       <div className="flex gap-2 flex-wrap">
-        {statuses.map(s => (
-          <button key={s} onClick={() => setFilterStatus(s)}
-            className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-all ${filterStatus === s ? 'bg-[#1E4B8F] text-white' : 'bg-white border border-gray-200 text-gray-600 hover:border-gray-300'}`}>
-            {s}
-          </button>
-        ))}
+      {STATUS_FILTERS.map(status => (
+  <button
+    key={status.value}
+    onClick={() => setFilterStatus(status.value)}
+    className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-all ${
+      filterStatus === status.value
+        ? 'bg-[#1E4B8F] text-white'
+        : 'bg-white border border-gray-200 text-gray-600 hover:border-gray-300'
+    }`}
+  >
+    {status.label}
+  </button>
+))}
       </div>
 
       {casesError && (
