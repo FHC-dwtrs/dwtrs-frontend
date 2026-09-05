@@ -2384,6 +2384,7 @@ export function CaseDetail({
   role,
   onActionComplete,
   onArchive,
+  readOnly,
 }: {
   c: CaseRecord
   tab: string
@@ -2392,6 +2393,8 @@ export function CaseDetail({
   role: string
   onActionComplete?: () => void
   onArchive?: (archived: boolean) => void
+  archiveError?: string
+  readOnly?: boolean
 }) {
   const { t } = useLanguage()
 
@@ -2677,7 +2680,7 @@ export function CaseDetail({
     c.rawStatus !== 'COMPLETED'
 
   const canAct =
-    role !== 'records' && isActive
+    role !== 'records' && isActive && !readOnly
 
   // ─────────────────────────────────────────────
   // Assign / Reassign
@@ -3237,7 +3240,7 @@ async function confirmTransfer() {
               )}
 
             {/* ARCHIVE */}
-            {role === 'sector' &&
+            {role === 'sector' && !readOnly &&
               c.rawStatus ===
                 'APPROVED' &&
               !c.isArchived && (
@@ -3253,7 +3256,7 @@ async function confirmTransfer() {
               )}
 
             {/* UNARCHIVE */}
-            {role === 'sector' &&
+            {role === 'sector' && !readOnly &&
               c.isArchived && (
                 <Btn
                   size="sm"

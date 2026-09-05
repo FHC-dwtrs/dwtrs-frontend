@@ -1,4 +1,5 @@
 import apiClient from "./client"
+import type { CaseItem } from './cases.api'
 
 export interface WorkflowActionResponse {
     success: boolean
@@ -132,6 +133,36 @@ export async function returnCase(
   ): Promise<WorkflowActionResponse> {
     const response = await apiClient.get<WorkflowActionResponse>(
       `/workflow/cases/${caseId}/remarks`
+    )
+    return response.data
+  }
+
+  export interface PreviouslyHandledCaseItem {
+    case: CaseItem
+    lastHandledAt: string
+    lastWorkflowAction: {
+      assignmentId: string
+      fromUnit: { unitId: string; name: string; unitType: string } | null
+      toUnit: { unitId: string; name: string; unitType: string } | null
+      assignedAt: string
+      completedAt: string | null
+      remarks: string | null
+    }
+  }
+  
+  export interface GetPreviouslyHandledResponse {
+    success: boolean
+    message: string
+    data: {
+      unit: { unitId: string; name: string; unitType: string }
+      count: number
+      cases: PreviouslyHandledCaseItem[]
+    }
+  }
+  
+  export async function getPreviouslyHandledCases(): Promise<GetPreviouslyHandledResponse> {
+    const response = await apiClient.get<GetPreviouslyHandledResponse>(
+      '/workflow/previously-handled'
     )
     return response.data
   }
