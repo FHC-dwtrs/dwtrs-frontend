@@ -55,9 +55,9 @@ const NAV: Record<Role, NavItem[]> = {
   group: [
     { labelKey: 'dashboard', icon: '🏠', page: 'dashboard' },
     { labelKey: 'myCases', icon: '📁', page: 'cases' },
-    { labelKey: 'documents', icon: '📄', page: 'documents' },
-    { labelKey: 'myRemarks', icon: '💬', page: 'remarks' },
-    { labelKey: 'delayed', icon: '⚠️', page: 'delayed' },
+   // { labelKey: 'documents', icon: '📄', page: 'documents' },
+    //{ labelKey: 'myRemarks', icon: '💬', page: 'remarks' },
+    //{ labelKey: 'delayed', icon: '⚠️', page: 'delayed' },
     { labelKey: 'notifications', icon: '🔔', page: 'notifications' },
   ],
   admin: [

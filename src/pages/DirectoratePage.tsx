@@ -4,8 +4,15 @@ import { CaseDetail } from './RecordsPage'
 import type { CaseRecord } from '../types'
 import { useLanguage } from '../i18n'
 import { getCases, type CaseItem } from '../api/cases.api'
-import { getOrganizations, type OrganizationUnit } from '../api/organizations.api'
+import {
+  getOrganizations,
+  type OrganizationUnit,
+} from '../api/organizations.api'
 import { mapCaseToRecord } from '../utils/caseMappers'
+import {
+  getPreviouslyHandledCases,
+  type PreviouslyHandledCaseItem,
+} from '../api/workflow.api'
 
 interface Props {
   page: string
@@ -14,24 +21,36 @@ interface Props {
   directorateUnitId: string
 }
 
-interface GroupWithStats extends OrganizationUnit {
-  activeCount: number
-  pendingCount: number
-  delayedCount: number
+// ── A single transfer event, ready to render ──
+interface TransferEvent {
+  assignmentId: string
+  trackingNumber: string
+  toUnitName: string
+  remarks: string | null
+  createdAt: string
 }
 
 export default function DirectoratePage({ page, setPage, directorateName, directorateUnitId }: Props) {
   const { t } = useLanguage()
   const [selectedCase, setSelectedCase] = useState<CaseRecord | null>(null)
   const [caseTab, setCaseTab] = useState('Overview')
+  const [viewOnly, setViewOnly] = useState(false)
   const [filterStatus, setFilterStatus] = useState('All')
 
   const [allCases, setAllCases] = useState<CaseItem[]>([])
   const [loadingCases, setLoadingCases] = useState(true)
   const [casesError, setCasesError] = useState('')
 
-  const [groups, setGroups] = useState<GroupWithStats[]>([])
+  const [groups, setGroups] = useState<OrganizationUnit[]>([])
   const [loadingGroups, setLoadingGroups] = useState(true)
+
+  const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null)
+
+  // ── Cases previously sent away by this directorate (used for both
+  //    Group-held cases and Transferred cases below) ──
+  const [previouslyHandled, setPreviouslyHandled] = useState<PreviouslyHandledCaseItem[]>([])
+  const [loadingPreviouslyHandled, setLoadingPreviouslyHandled] = useState(false)
+  const [previouslyHandledError, setPreviouslyHandledError] = useState('')
 
   async function loadCases() {
     try {
@@ -52,11 +71,10 @@ export default function DirectoratePage({ page, setPage, directorateName, direct
   }, [])
 
   // Cases currently sitting at THIS directorate
-  //const dirCases = allCases.filter(c => c.currentUnit?.unitId === directorateUnitId)
   const dirCases = allCases.filter(
     c => c.currentUnit?.unitId === directorateUnitId
   )
-  //const dirCases = allCases
+
   useEffect(() => {
     async function loadGroups() {
       try {
@@ -64,21 +82,7 @@ export default function DirectoratePage({ page, setPage, directorateName, direct
         const result = await getOrganizations({ unitType: 'GROUP', isActive: true })
         const all = result.data ?? []
         const dirGroups = all.filter((g: any) => g.parentUnitId === directorateUnitId)
-
-        const groupsWithStats: GroupWithStats[] = dirGroups.map((g: OrganizationUnit) => {
-          const groupCases = allCases.filter(c => c.currentUnit?.unitId === g.unitId)
-          const activeCount = groupCases.filter(c =>
-            c.status === 'SUBMITTED' || c.status === 'UNDER_REVIEW' || c.status === 'IN_PROGRESS' || c.status === 'PENDING_CLARIFICATION'
-          ).length
-          const pendingCount = groupCases.filter(c => c.status === 'UNDER_REVIEW').length
-          const delayedCount = groupCases.filter(c => {
-            const diffDays = Math.ceil((Date.now() - new Date(c.submittedAt).getTime()) / (1000 * 60 * 60 * 24))
-            return diffDays > 7 && c.status !== 'APPROVED' && c.status !== 'REJECTED' && c.status !== 'ARCHIVED'
-          }).length
-          return { ...g, activeCount, pendingCount, delayedCount }
-        })
-
-        setGroups(groupsWithStats)
+        setGroups(dirGroups)
       } catch (err) {
         console.error('Failed to load groups:', err)
       } finally {
@@ -86,12 +90,81 @@ export default function DirectoratePage({ page, setPage, directorateName, direct
       }
     }
     if (directorateUnitId) loadGroups()
-  }, [directorateUnitId, allCases])
+  }, [directorateUnitId])
 
-  function openCase(c: CaseRecord) {
+  // ── Load "previously handled" cases whenever either the Group-cases
+  //    or Transfers page is opened — both derive from this same set. ──
+  useEffect(() => {
+    if (page !== 'group-cases' && page !== 'transfers') return
+
+    let cancelled = false
+
+    async function load() {
+      try {
+        setLoadingPreviouslyHandled(true)
+        setPreviouslyHandledError('')
+
+        const result = await getPreviouslyHandledCases()
+
+        // TEMP DEBUG — check this in your browser console to confirm
+        // whether the backend is actually returning your transferred
+        // case at all, and what its lastWorkflowAction.toUnit looks
+        // like. Remove this line once confirmed working.
+        console.log('previously-handled raw response:', result.data)
+
+        if (!cancelled) setPreviouslyHandled(result.data?.cases ?? [])
+      } catch (err: any) {
+        if (cancelled) return
+        console.error('Failed to load previously handled cases:', err)
+        setPreviouslyHandledError(
+          err.response?.data?.message || 'Failed to load cases.'
+        )
+      } finally {
+        if (!cancelled) setLoadingPreviouslyHandled(false)
+      }
+    }
+
+    load()
+
+    return () => {
+      cancelled = true
+    }
+  }, [page])
+
+  // Cases currently held by whichever Group the user drilled into
+  const groupCases = previouslyHandled
+    .filter(item => item.case.currentUnitId === selectedGroupId)
+    .map(item => item.case)
+
+  const selectedGroup = groups.find(g => g.unitId === selectedGroupId)
+
+  // Cases this directorate sent to ANOTHER DIRECTORATE — the only
+  // destination type that means "transfer" for a Directorate sender.
+  // Casing normalized defensively in case the backend or serializer
+  // ever returns anything other than the exact enum string.
+  const transfers: TransferEvent[] = previouslyHandled
+    .filter(
+      item =>
+        item.lastWorkflowAction.toUnit?.unitType?.toUpperCase() === 'DIRECTORATE'
+    )
+    .map(item => ({
+      assignmentId: item.lastWorkflowAction.assignmentId,
+      trackingNumber: item.case.trackingNumber,
+      toUnitName: item.lastWorkflowAction.toUnit?.name ?? 'Unknown directorate',
+      remarks: item.lastWorkflowAction.remarks,
+      createdAt: item.lastWorkflowAction.assignedAt,
+    }))
+
+  function openCase(c: CaseRecord, readOnly = false) {
     setSelectedCase(c)
+    setViewOnly(readOnly)
     setPage('case-detail')
     setCaseTab('Overview')
+  }
+
+  function openGroupCases(unitId: string) {
+    setSelectedGroupId(unitId)
+    setPage('group-cases')
   }
 
   if (page === 'case-detail' && selectedCase) {
@@ -100,9 +173,19 @@ export default function DirectoratePage({ page, setPage, directorateName, direct
         c={selectedCase}
         tab={caseTab}
         setTab={setCaseTab}
-        onBack={() => { setSelectedCase(null); setPage('cases') }}
+        onBack={() => {
+          setSelectedCase(null)
+          setViewOnly(false)
+          setPage(viewOnly ? 'group-cases' : 'cases')
+        }}
         role="directorate"
-        onActionComplete={() => { loadCases(); setSelectedCase(null); setPage('cases') }}
+        onActionComplete={() => {
+          loadCases()
+          setSelectedCase(null)
+          setViewOnly(false)
+          setPage('cases')
+        }}
+        readOnly={viewOnly}
       />
     )
   }
@@ -113,38 +196,143 @@ export default function DirectoratePage({ page, setPage, directorateName, direct
     .filter(c => filterStatus === 'All' || mapCaseToRecord(c).status === filterStatus)
     .map(mapCaseToRecord)
 
+  // ── All Groups (simple list, no unreliable stats) ──
   if (page === 'groups') {
     return (
       <div className="p-6 space-y-4">
         <h2 className="text-xl font-black text-gray-900" style={{ fontFamily: 'var(--font-display)' }}>{t('groupOverview')}</h2>
-        {loadingGroups ? (
-          <p className="text-sm text-gray-400">Loading...</p>
-        ) : groups.length === 0 ? (
-          <p className="text-sm text-gray-400">No groups found for this directorate.</p>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {groups.map(g => (
-              <div key={g.unitId} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="font-bold text-gray-900">{g.name}</h3>
-                  {g.delayedCount > 0 && (
-                    <span className="text-xs bg-red-50 text-red-600 px-2 py-1 rounded-full font-semibold">
-                      ⚠ {g.delayedCount} {t('delayed')}
-                    </span>
-                  )}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100">
+          {loadingGroups ? (
+            <div className="p-10 text-center text-sm text-gray-500">Loading groups...</div>
+          ) : groups.length === 0 ? (
+            <EmptyState icon="👥" title="No groups found" sub="No groups are set up under this directorate yet." />
+          ) : (
+            <div className="divide-y divide-gray-50">
+              {groups.map(g => (
+                <div key={g.unitId} className="px-6 py-4 hover:bg-gray-50 transition-colors flex items-center justify-between">
+                  <h3 className="font-semibold text-gray-900">{g.name}</h3>
+                  <Btn
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => openGroupCases(g.unitId)}
+                  >
+                    View Cases
+                  </Btn>
                 </div>
-                <div className="grid grid-cols-3 gap-3">
-                  {[[t('active'), g.activeCount], [t('kpi_pending'), g.pendingCount], [t('delayed'), g.delayedCount]].map(([l, v]) => (
-                    <div key={l as string} className="bg-gray-50 rounded-lg p-3 text-center">
-                      <p className="text-xs text-gray-500">{l}</p>
-                      <p className="text-xl font-black text-gray-900">{v}</p>
-                    </div>
-                  ))}
-                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    )
+  }
+
+  // ── Cases for one specific Group (read-only) ──
+  if (page === 'group-cases') {
+    return (
+      <div className="p-6 space-y-4">
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setPage('groups')}
+            className="text-sm text-gray-500 hover:text-gray-700"
+          >
+            ← Back to Groups
+          </button>
+        </div>
+        <h2 className="text-xl font-black text-gray-900" style={{ fontFamily: 'var(--font-display)' }}>
+          {selectedGroup?.name ?? 'Group'} — Cases
+        </h2>
+        <p className="text-sm text-gray-500 -mt-2">
+          Read-only view of cases currently being worked on by this group.
+        </p>
+
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100">
+          {loadingPreviouslyHandled ? (
+            <div className="p-10 text-center text-sm text-gray-500">Loading cases...</div>
+          ) : previouslyHandledError ? (
+            <div className="p-6">
+              <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-sm">
+                {previouslyHandledError}
               </div>
-            ))}
-          </div>
-        )}
+            </div>
+          ) : groupCases.length === 0 ? (
+            <EmptyState icon="📁" title="No cases here" sub="This group has no cases assigned right now." />
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-gray-100">
+                    {[t('col_trackingNo'), t('col_subject'), t('col_status'), t('col_priority'), t('col_lastActivity'), ''].map(h => (
+                      <th key={h} className="text-left px-5 py-3 text-xs font-bold text-gray-400 uppercase tracking-wide">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {groupCases.map(mapCaseToRecord).map(c => (
+                    <tr key={c.id} onClick={() => openCase(c, true)} className="border-b border-gray-50 hover:bg-gray-50 cursor-pointer transition-colors">
+                      <td className="px-5 py-3.5 font-mono font-semibold text-[#1E4B8F] text-xs">{c.id}</td>
+                      <td className="px-5 py-3.5 font-medium text-gray-900 max-w-[180px] truncate">{c.subject}</td>
+                      <td className="px-5 py-3.5"><StatusBadge status={c.status} /></td>
+                      <td className="px-5 py-3.5"><PriorityBadge priority={c.priority} /></td>
+                      <td className="px-5 py-3.5 text-xs text-gray-400">{c.lastActivity}</td>
+                      <td className="px-5 py-3.5"><button className="text-xs text-[#1E4B8F] font-semibold hover:underline">View</button></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </div>
+    )
+  }
+
+  // ── Transfers (read-only, cases this directorate sent to another directorate) ──
+  if (page === 'transfers') {
+    return (
+      <div className="p-6 space-y-4">
+        <h2 className="text-xl font-black text-gray-900" style={{ fontFamily: 'var(--font-display)' }}>Transferred Cases</h2>
+        <p className="text-sm text-gray-500 -mt-2">
+          Read-only history of cases this directorate has transferred to another directorate.
+        </p>
+
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100">
+          {loadingPreviouslyHandled ? (
+            <div className="p-10 text-center text-sm text-gray-500">Loading transfer history...</div>
+          ) : previouslyHandledError ? (
+            <div className="p-6">
+              <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-sm">
+                {previouslyHandledError}
+              </div>
+            </div>
+          ) : transfers.length === 0 ? (
+            <EmptyState icon="⇄" title="No transfers yet" sub="This directorate hasn't transferred any cases to another directorate." />
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-gray-100">
+                    {['Tracking No', 'Transferred To', 'Remark', 'Date'].map(h => (
+                      <th key={h} className="text-left px-5 py-3 text-xs font-bold text-gray-400 uppercase tracking-wide whitespace-nowrap">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {transfers.map(tr => (
+                    <tr key={tr.assignmentId} className="border-b border-gray-50">
+                      <td className="px-5 py-3.5 font-mono font-semibold text-[#1E4B8F] text-xs">{tr.trackingNumber}</td>
+                      <td className="px-5 py-3.5 text-gray-600">{tr.toUnitName}</td>
+                      <td className="px-5 py-3.5 text-gray-500 max-w-[220px] truncate">{tr.remarks ?? '—'}</td>
+                      <td className="px-5 py-3.5 text-gray-400 text-xs whitespace-nowrap">
+                        {new Date(tr.createdAt).toLocaleString()}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
       </div>
     )
   }
@@ -194,23 +382,23 @@ export default function DirectoratePage({ page, setPage, directorateName, direct
             </div>
           </div>
 
+          {/* ── Group Overview widget (names only, no stats) ── */}
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100">
             <div className="px-6 py-4 border-b border-gray-100">
               <h2 className="text-base font-bold text-gray-900" style={{ fontFamily: 'var(--font-display)' }}>{t('groupOverview')}</h2>
             </div>
             <div className="divide-y divide-gray-50">
-              {groups.map(g => (
-                <div key={g.unitId} className="px-6 py-4">
-                  <div className="flex items-center justify-between mb-1">
+              {loadingGroups ? (
+                <div className="px-6 py-8 text-center text-sm text-gray-400">Loading groups...</div>
+              ) : groups.length === 0 ? (
+                <div className="px-6 py-8 text-center text-sm text-gray-400">No groups found.</div>
+              ) : (
+                groups.map(g => (
+                  <div key={g.unitId} className="px-6 py-4">
                     <p className="text-sm font-bold text-gray-800">{g.name}</p>
-                    {g.delayedCount > 0 && <span className="text-xs text-red-600 font-semibold">⚠ {t('delayed')}</span>}
                   </div>
-                  <div className="flex gap-4 text-xs text-gray-500">
-                    <span><strong className="text-gray-800">{g.activeCount}</strong> {t('active')}</span>
-                    <span><strong className="text-gray-800">{g.pendingCount}</strong> {t('pendingDecision')}</span>
-                  </div>
-                </div>
-              ))}
+                ))
+              )}
             </div>
             <div className="px-6 py-3 border-t border-gray-50">
               <button onClick={() => setPage('groups')} className="text-xs text-[#1E4B8F] font-semibold hover:underline">{t('manageGroups')}</button>
