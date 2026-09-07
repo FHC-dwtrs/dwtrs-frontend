@@ -41,7 +41,7 @@ const NAV: Record<Role, NavItem[]> = {
     { labelKey: 'dashboard', icon: '🏠', page: 'dashboard' },
     { labelKey: 'cases', icon: '📁', page: 'cases', children: [
       { labelKey: 'allCases', icon: '', page: 'cases' },
-      { labelKey: 'incoming', icon: '', page: 'incoming' },
+     // { labelKey: 'incoming', icon: '', page: 'incoming' },
       //{ labelKey: 'active', icon: '', page: 'active' },
       { labelKey: 'returned', icon: '', page: 'returned' },
      // { labelKey: 'archived', icon: '', page: 'archived' },
@@ -49,7 +49,7 @@ const NAV: Record<Role, NavItem[]> = {
     { labelKey: 'groups', icon: '👥', page: 'groups' },
     { labelKey: 'transfers', icon: '🔄', page: 'transfers' },
    // { labelKey: 'documents', icon: '📄', page: 'documents' },
-    { labelKey: 'reports', icon: '📊', page: 'reports' },
+    //{ labelKey: 'reports', icon: '📊', page: 'reports' },
     { labelKey: 'notifications', icon: '🔔', page: 'notifications' },
   ],
   group: [
@@ -68,9 +68,9 @@ const NAV: Record<Role, NavItem[]> = {
       { labelKey: 'directorates', icon: '', page: 'directorates' },
       { labelKey: 'groups', icon: '', page: 'groups' },
     ]},
-    { labelKey: 'rolesPermissions', icon: '🔐', page: 'roles' },
+    //{ labelKey: 'rolesPermissions', icon: '🔐', page: 'roles' },
     { labelKey: 'auditLogs', icon: '📋', page: 'audit' },
-    { labelKey: 'systemSettings', icon: '⚙️', page: 'settings' },
+   // { labelKey: 'systemSettings', icon: '⚙️', page: 'settings' },
     { labelKey: 'notifications', icon: '🔔', page: 'notifications' },
   ],
 }
