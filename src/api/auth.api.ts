@@ -15,11 +15,23 @@ export interface LoginResponse {
   }
 }
 
+// ============================================================
+// AUTHENTICATED USER
+// ============================================================
+
 export interface MeUser {
-  sub: string
+  userId: string
+  name: string
   email: string
+
+  unit: {
+    id: string
+    name: string
+    unitType: string
+  }
+
   role: string
-  unitId: string | null
+  permissions: string[]
 }
 
 export interface MeResponse {
@@ -27,6 +39,10 @@ export interface MeResponse {
   message: string
   user: MeUser
 }
+
+// ============================================================
+// LOGIN
+// ============================================================
 
 export async function login(
   credentials: LoginRequest
@@ -39,8 +55,14 @@ export async function login(
   return response.data
 }
 
+// ============================================================
+// GET CURRENT USER
+// ============================================================
+
 export async function getMe(): Promise<MeResponse> {
-  const response = await apiClient.get<MeResponse>('/auth/me')
+  const response = await apiClient.get<MeResponse>(
+    '/auth/me'
+  )
 
   return response.data
 }

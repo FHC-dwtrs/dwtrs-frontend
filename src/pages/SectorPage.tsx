@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+
 import {
   StatusBadge,
   KpiCard,
@@ -50,14 +51,23 @@ import {
   type PreviouslyHandledCaseItem,
 } from '../api/workflow.api'
 
+import {
+  getMe,
+  type MeUser,
+} from '../api/auth.api'
+
+// ============================================================
+// PROPS
+// ============================================================
+
 interface Props {
   page: string
   setPage: (p: string) => void
-  sectorName: string
-  sectorUnitId: string
 }
 
-// ── Directorate with case counts ──
+// ============================================================
+// DIRECTORATE WITH CASE COUNTS
+// ============================================================
 
 interface DirectorateWithStats extends OrganizationUnit {
   activeCount: number
@@ -65,7 +75,9 @@ interface DirectorateWithStats extends OrganizationUnit {
   delayedCount: number
 }
 
-// ── A single transfer event, ready to render ──
+// ============================================================
+// TRANSFER EVENT
+// ============================================================
 
 interface TransferEvent {
   auditLogId: string
@@ -77,25 +89,51 @@ interface TransferEvent {
   createdAt: string
 }
 
+// ============================================================
+// SECTOR PAGE
+// ============================================================
+
 export default function SectorPage({
   page,
   setPage,
-  sectorName,
-  sectorUnitId,
 }: Props) {
   const { t } = useLanguage()
+
+  // ============================================================
+  // CURRENT AUTHENTICATED USER
+  // ============================================================
+
+  const [currentUser, setCurrentUser] =
+    useState<MeUser | null>(null)
+
+  const [loadingUser, setLoadingUser] =
+    useState(true)
+
+  const [userError, setUserError] =
+    useState('')
+
+  // ============================================================
+  // CASE DETAIL
+  // ============================================================
 
   const [selectedCase, setSelectedCase] =
     useState<CaseRecord | null>(null)
 
-  const [caseTab, setCaseTab] = useState('Overview')
+  const [caseTab, setCaseTab] =
+    useState('Overview')
 
-  const [viewOnly, setViewOnly] = useState(false)
+  const [viewOnly, setViewOnly] =
+    useState(false)
+
+  // ============================================================
+  // CASE FILTERS
+  // ============================================================
 
   const [filterStatus, setFilterStatus] =
     useState('ALL')
 
-  const [searchQ, setSearchQ] = useState('')
+  const [searchQ, setSearchQ] =
+    useState('')
 
   // ============================================================
   // CASES
@@ -187,6 +225,59 @@ export default function SectorPage({
 
   const [reportsError, setReportsError] =
     useState('')
+
+  // ============================================================
+  // CURRENT UNIT ID
+  //
+  // Comes from /auth/me:
+  // user.unit.id
+  // ============================================================
+
+  const currentUnitId =
+    currentUser?.unit?.id
+
+  // ============================================================
+  // LOAD CURRENT USER
+  // ============================================================
+
+  useEffect(() => {
+    let cancelled = false
+
+    async function loadCurrentUser() {
+      try {
+        setLoadingUser(true)
+        setUserError('')
+
+        const result = await getMe()
+
+        if (!cancelled) {
+          setCurrentUser(result.user)
+        }
+      } catch (err: any) {
+        if (cancelled) return
+
+        console.error(
+          'Failed to load current user:',
+          err
+        )
+
+        setUserError(
+          err.response?.data?.message ||
+            'Failed to load user information.'
+        )
+      } finally {
+        if (!cancelled) {
+          setLoadingUser(false)
+        }
+      }
+    }
+
+    loadCurrentUser()
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   // ============================================================
   // LOAD SECTOR CASES
@@ -375,6 +466,10 @@ export default function SectorPage({
 
   useEffect(() => {
     async function loadDirectorates() {
+      if (!currentUnitId) {
+        return
+      }
+
       try {
         setLoadingDirectorates(true)
 
@@ -389,7 +484,8 @@ export default function SectorPage({
         const sectorDirectorates =
           all.filter(
             (d: any) =>
-              d.parentUnitId === sectorUnitId
+              d.parentUnitId ===
+              currentUnitId
           )
 
         const directoratesWithStats =
@@ -405,9 +501,12 @@ export default function SectorPage({
               const activeCount =
                 directorateCases.filter(
                   c =>
-                    c.status === 'SUBMITTED' ||
-                    c.status === 'UNDER_REVIEW' ||
-                    c.status === 'IN_PROGRESS' ||
+                    c.status ===
+                      'SUBMITTED' ||
+                    c.status ===
+                      'UNDER_REVIEW' ||
+                    c.status ===
+                      'IN_PROGRESS' ||
                     c.status ===
                       'PENDING_CLARIFICATION'
                 ).length
@@ -445,9 +544,12 @@ export default function SectorPage({
 
                   return (
                     diffDays > 7 &&
-                    c.status !== 'APPROVED' &&
-                    c.status !== 'REJECTED' &&
-                    c.status !== 'ARCHIVED'
+                    c.status !==
+                      'APPROVED' &&
+                    c.status !==
+                      'REJECTED' &&
+                    c.status !==
+                      'ARCHIVED'
                   )
                 }).length
 
@@ -473,10 +575,10 @@ export default function SectorPage({
       }
     }
 
-    if (sectorUnitId) {
+    if (currentUnitId) {
       loadDirectorates()
     }
-  }, [sectorUnitId, allCases])
+  }, [currentUnitId, allCases])
 
   // ============================================================
   // LOAD TRANSFER HISTORY
@@ -527,9 +629,13 @@ export default function SectorPage({
 
                 return (
                   (fromId &&
-                    nameById.has(fromId)) ||
+                    nameById.has(
+                      fromId
+                    )) ||
                   (toId &&
-                    nameById.has(toId))
+                    nameById.has(
+                      toId
+                    ))
                 )
               }
             )
@@ -625,7 +731,7 @@ export default function SectorPage({
   const myCases = allCases.filter(
     c =>
       c.currentUnit?.unitId ===
-      sectorUnitId
+      currentUnitId
   )
 
   const selectedDirectorateCases =
@@ -640,19 +746,22 @@ export default function SectorPage({
   const awaitingDecision =
     myCases.filter(
       c =>
-        c.status === 'UNDER_REVIEW'
+        c.status ===
+        'UNDER_REVIEW'
     )
 
   const approvedCases =
     myCases.filter(
       c =>
-        c.status === 'APPROVED'
+        c.status ===
+        'APPROVED'
     )
 
   const rejectedCases =
     myCases.filter(
       c =>
-        c.status === 'REJECTED'
+        c.status ===
+        'REJECTED'
     )
 
   // ============================================================
@@ -689,6 +798,38 @@ export default function SectorPage({
   ) {
     setSelectedDirectorateId(unitId)
     setPage('directorate-cases')
+  }
+
+  // ============================================================
+  // USER LOADING / ERROR
+  // ============================================================
+
+  if (
+    loadingUser &&
+    !currentUser
+  ) {
+    return (
+      <div className="p-6">
+        <div className="bg-white rounded-2xl border border-gray-100 p-10 text-center">
+          <div className="text-sm text-gray-500">
+            Loading your sector information...
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (
+    userError &&
+    !currentUser
+  ) {
+    return (
+      <div className="p-6">
+        <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-sm">
+          {userError}
+        </div>
+      </div>
+    )
   }
 
   // ============================================================
@@ -739,7 +880,8 @@ export default function SectorPage({
   // ============================================================
 
   if (
-    page === 'directorate-cases'
+    page ===
+    'directorate-cases'
   ) {
     return (
       <div className="p-6 space-y-4">
@@ -839,7 +981,9 @@ export default function SectorPage({
           unitReport={unitReport}
           workflowReport={workflowReport}
           pendingReport={pendingReport}
-          statisticsReport={statisticsReport}
+          statisticsReport={
+            statisticsReport
+          }
           reportPeriod={reportPeriod}
           onPeriodChange={period =>
             setReportPeriod(period)
@@ -944,8 +1088,15 @@ export default function SectorPage({
           </h1>
 
           <p className="text-gray-500 text-sm">
-            {sectorName}
+            {currentUser?.unit?.name ??
+              'Sector'}
           </p>
+
+          {currentUser && (
+            <p className="text-xs text-gray-400 mt-1">
+              {currentUser.name}
+            </p>
+          )}
         </div>
 
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -1628,6 +1779,7 @@ function ReportsTabs({
   error: string
   onRefresh: () => void
 }) {
+
   // ==========================================================
   // LOADING
   // ==========================================================
@@ -1710,9 +1862,7 @@ function ReportsTabs({
   return (
     <div className="space-y-6">
 
-      {/* ======================================================
-          REPORT HEADER
-      ====================================================== */}
+      {/* REPORT HEADER */}
 
       <div className="flex items-center justify-between flex-wrap gap-3">
 
@@ -1750,8 +1900,6 @@ function ReportsTabs({
 
         <div className="flex items-center gap-2">
 
-          {/* PERIOD SELECTOR */}
-
           <select
             value={reportPeriod}
             onChange={e =>
@@ -1761,6 +1909,7 @@ function ReportsTabs({
             }
             className="px-3 py-2 rounded-lg border border-gray-200 bg-white text-sm font-semibold text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#1E4B8F]/20"
           >
+
             <option value="DAILY">
               Daily
             </option>
@@ -1776,6 +1925,7 @@ function ReportsTabs({
             <option value="ANNUAL">
               Annual
             </option>
+
           </select>
 
           <button
@@ -1789,37 +1939,43 @@ function ReportsTabs({
 
       </div>
 
-      {/* ======================================================
-          STATISTICS KPIs
-      ====================================================== */}
+      {/* STATISTICS KPIs */}
 
       {statisticsReport && (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
 
           <ReportMetricCard
             label="Received"
-            value={statisticsReport.received}
+            value={
+              statisticsReport.received
+            }
             icon="📥"
             description="Cases received"
           />
 
           <ReportMetricCard
             label="Processed"
-            value={statisticsReport.processed}
+            value={
+              statisticsReport.processed
+            }
             icon="⚙️"
             description="Cases processed"
           />
 
           <ReportMetricCard
             label="Approved"
-            value={statisticsReport.approved}
+            value={
+              statisticsReport.approved
+            }
             icon="✅"
             description="Cases approved"
           />
 
           <ReportMetricCard
             label="Pending"
-            value={statisticsReport.pending}
+            value={
+              statisticsReport.pending
+            }
             icon="⏳"
             description="Cases still pending"
           />
@@ -1827,9 +1983,7 @@ function ReportsTabs({
         </div>
       )}
 
-      {/* ======================================================
-          STATISTICS DETAILS
-      ====================================================== */}
+      {/* STATISTICS DETAILS */}
 
       {statisticsReport && (
         <ReportSection
@@ -1844,32 +1998,44 @@ function ReportsTabs({
 
             <MiniReportCard
               label="Received"
-              value={statisticsReport.received}
+              value={
+                statisticsReport.received
+              }
             />
 
             <MiniReportCard
               label="Processed"
-              value={statisticsReport.processed}
+              value={
+                statisticsReport.processed
+              }
             />
 
             <MiniReportCard
               label="Completed"
-              value={statisticsReport.completed}
+              value={
+                statisticsReport.completed
+              }
             />
 
             <MiniReportCard
               label="Pending"
-              value={statisticsReport.pending}
+              value={
+                statisticsReport.pending
+              }
             />
 
             <MiniReportCard
               label="Approved"
-              value={statisticsReport.approved}
+              value={
+                statisticsReport.approved
+              }
             />
 
             <MiniReportCard
               label="Rejected"
-              value={statisticsReport.rejected}
+              value={
+                statisticsReport.rejected
+              }
             />
 
             <MiniReportCard
@@ -1904,9 +2070,7 @@ function ReportsTabs({
         </ReportSection>
       )}
 
-      {/* ======================================================
-          STATUS SUMMARY
-      ====================================================== */}
+      {/* STATUS SUMMARY */}
 
       {summaryReport && (
         <ReportSection
@@ -1916,6 +2080,7 @@ function ReportsTabs({
         >
 
           <div className="mb-4">
+
             <div className="text-2xl font-black text-gray-900">
               {summaryReport.totalCases}
             </div>
@@ -1923,6 +2088,7 @@ function ReportsTabs({
             <div className="text-xs text-gray-400">
               Total cases
             </div>
+
           </div>
 
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
@@ -1995,9 +2161,7 @@ function ReportsTabs({
         </ReportSection>
       )}
 
-      {/* ======================================================
-          CASES BY UNIT
-      ====================================================== */}
+      {/* CASES BY UNIT */}
 
       <ReportSection
         title="Cases by Organizational Unit"
@@ -2019,9 +2183,7 @@ function ReportsTabs({
 
       </ReportSection>
 
-      {/* ======================================================
-          WORKFLOW REPORT
-      ====================================================== */}
+      {/* WORKFLOW REPORT */}
 
       {workflowReport && (
         <ReportSection
@@ -2084,9 +2246,7 @@ function ReportsTabs({
         </ReportSection>
       )}
 
-      {/* ======================================================
-          PENDING REPORT
-      ====================================================== */}
+      {/* PENDING REPORT */}
 
       <ReportSection
         title="Pending & Delayed Cases"
@@ -2308,7 +2468,6 @@ function UnitReportTable({
           ))}
 
         </tbody>
-
       </table>
 
     </div>
@@ -2381,7 +2540,6 @@ function WorkflowRoutesTable({
           ))}
 
         </tbody>
-
       </table>
 
     </div>
@@ -2498,7 +2656,6 @@ function PendingCasesTable({
           ))}
 
         </tbody>
-
       </table>
 
     </div>

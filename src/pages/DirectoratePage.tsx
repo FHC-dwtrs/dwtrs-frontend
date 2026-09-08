@@ -1,5 +1,11 @@
 import { useState, useEffect } from 'react'
-import { StatusBadge, KpiCard, Btn, EmptyState, PriorityBadge } from '../components/ui'
+import {
+  StatusBadge,
+  KpiCard,
+  Btn,
+  EmptyState,
+  PriorityBadge,
+} from '../components/ui'
 import { CaseDetail } from './RecordsPage'
 import type { CaseRecord } from '../types'
 import { useLanguage } from '../i18n'
@@ -13,12 +19,11 @@ import {
   getPreviouslyHandledCases,
   type PreviouslyHandledCaseItem,
 } from '../api/workflow.api'
+import { getMe, type MeUser } from '../api/auth.api'
 
 interface Props {
   page: string
   setPage: (p: string) => void
-  directorateName: string
-  directorateUnitId: string
 }
 
 // ── A single transfer event, ready to render ──
@@ -30,37 +35,107 @@ interface TransferEvent {
   createdAt: string
 }
 
-export default function DirectoratePage({ page, setPage, directorateName, directorateUnitId }: Props) {
+export default function DirectoratePage({ page, setPage }: Props) {
   const { t } = useLanguage()
+
+  // ============================================================
+  // AUTHENTICATED USER
+  // ============================================================
+
+  const [me, setMe] = useState<MeUser | null>(null)
+  const [loadingMe, setLoadingMe] = useState(true)
+  const [meError, setMeError] = useState('')
+
+  // ============================================================
+  // CASE DETAIL
+  // ============================================================
+
   const [selectedCase, setSelectedCase] = useState<CaseRecord | null>(null)
   const [caseTab, setCaseTab] = useState('Overview')
   const [viewOnly, setViewOnly] = useState(false)
   const [filterStatus, setFilterStatus] = useState('All')
 
+  // ============================================================
+  // CASES
+  // ============================================================
+
   const [allCases, setAllCases] = useState<CaseItem[]>([])
   const [loadingCases, setLoadingCases] = useState(true)
   const [casesError, setCasesError] = useState('')
+
+  // ============================================================
+  // GROUPS
+  // ============================================================
 
   const [groups, setGroups] = useState<OrganizationUnit[]>([])
   const [loadingGroups, setLoadingGroups] = useState(true)
 
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null)
 
-  // ── Cases previously sent away by this directorate (used for both
-  //    Group-held cases and Transferred cases below) ──
-  const [previouslyHandled, setPreviouslyHandled] = useState<PreviouslyHandledCaseItem[]>([])
-  const [loadingPreviouslyHandled, setLoadingPreviouslyHandled] = useState(false)
+  // ============================================================
+  // PREVIOUSLY HANDLED CASES
+  // Used for Group Cases and Transfers
+  // ============================================================
+
+  const [previouslyHandled, setPreviouslyHandled] = useState<
+    PreviouslyHandledCaseItem[]
+  >([])
+  const [loadingPreviouslyHandled, setLoadingPreviouslyHandled] =
+    useState(false)
   const [previouslyHandledError, setPreviouslyHandledError] = useState('')
+
+  // ============================================================
+  // GET AUTHENTICATED USER
+  // ============================================================
+
+  useEffect(() => {
+    async function loadMe() {
+      try {
+        setLoadingMe(true)
+        setMeError('')
+
+        const result = await getMe()
+
+        setMe(result.user)
+      } catch (err: any) {
+        console.error('Failed to load authenticated user:', err)
+
+        setMeError(
+          err.response?.data?.message ||
+            'Failed to load authenticated user.'
+        )
+      } finally {
+        setLoadingMe(false)
+      }
+    }
+
+    loadMe()
+  }, [])
+
+  // ============================================================
+  // REAL LOGGED-IN UNIT ID
+  // ============================================================
+
+  const directorateUnitId = me?.unit.id ?? ''
+
+  // ============================================================
+  // LOAD CASES
+  // ============================================================
 
   async function loadCases() {
     try {
       setLoadingCases(true)
       setCasesError('')
+
       const result = await getCases()
+
       setAllCases(result.data ?? [])
     } catch (err: any) {
       console.error('Failed to load cases:', err)
-      setCasesError(err.response?.data?.message || 'Failed to load cases.')
+
+      setCasesError(
+        err.response?.data?.message || 'Failed to load cases.'
+      )
     } finally {
       setLoadingCases(false)
     }
@@ -70,18 +145,36 @@ export default function DirectoratePage({ page, setPage, directorateName, direct
     loadCases()
   }, [])
 
-  // Cases currently sitting at THIS directorate
+  // ============================================================
+  // CASES CURRENTLY SITTING AT THIS DIRECTORATE
+  // ============================================================
+
   const dirCases = allCases.filter(
     c => c.currentUnit?.unitId === directorateUnitId
   )
 
+  // ============================================================
+  // LOAD GROUPS BELONGING TO THIS DIRECTORATE
+  // ============================================================
+
   useEffect(() => {
     async function loadGroups() {
+      if (!directorateUnitId) return
+
       try {
         setLoadingGroups(true)
-        const result = await getOrganizations({ unitType: 'GROUP', isActive: true })
+
+        const result = await getOrganizations({
+          unitType: 'GROUP',
+          isActive: true,
+        })
+
         const all = result.data ?? []
-        const dirGroups = all.filter((g: any) => g.parentUnitId === directorateUnitId)
+
+        const dirGroups = all.filter(
+          (g: any) => g.parentUnitId === directorateUnitId
+        )
+
         setGroups(dirGroups)
       } catch (err) {
         console.error('Failed to load groups:', err)
@@ -89,11 +182,15 @@ export default function DirectoratePage({ page, setPage, directorateName, direct
         setLoadingGroups(false)
       }
     }
-    if (directorateUnitId) loadGroups()
+
+    loadGroups()
   }, [directorateUnitId])
 
-  // ── Load "previously handled" cases whenever either the Group-cases
-  //    or Transfers page is opened — both derive from this same set. ──
+  // ============================================================
+  // LOAD PREVIOUSLY HANDLED CASES
+  // Used by Group Cases and Transfers
+  // ============================================================
+
   useEffect(() => {
     if (page !== 'group-cases' && page !== 'transfers') return
 
@@ -106,21 +203,31 @@ export default function DirectoratePage({ page, setPage, directorateName, direct
 
         const result = await getPreviouslyHandledCases()
 
-        // TEMP DEBUG — check this in your browser console to confirm
-        // whether the backend is actually returning your transferred
-        // case at all, and what its lastWorkflowAction.toUnit looks
-        // like. Remove this line once confirmed working.
-        console.log('previously-handled raw response:', result.data)
+        // TEMP DEBUG
+        console.log(
+          'previously-handled raw response:',
+          result.data
+        )
 
-        if (!cancelled) setPreviouslyHandled(result.data?.cases ?? [])
+        if (!cancelled) {
+          setPreviouslyHandled(result.data?.cases ?? [])
+        }
       } catch (err: any) {
         if (cancelled) return
-        console.error('Failed to load previously handled cases:', err)
+
+        console.error(
+          'Failed to load previously handled cases:',
+          err
+        )
+
         setPreviouslyHandledError(
-          err.response?.data?.message || 'Failed to load cases.'
+          err.response?.data?.message ||
+            'Failed to load cases.'
         )
       } finally {
-        if (!cancelled) setLoadingPreviouslyHandled(false)
+        if (!cancelled) {
+          setLoadingPreviouslyHandled(false)
+        }
       }
     }
 
@@ -131,41 +238,67 @@ export default function DirectoratePage({ page, setPage, directorateName, direct
     }
   }, [page])
 
-  // Cases currently held by whichever Group the user drilled into
+  // ============================================================
+  // CASES CURRENTLY HELD BY SELECTED GROUP
+  // ============================================================
+
   const groupCases = previouslyHandled
-    .filter(item => item.case.currentUnitId === selectedGroupId)
+    .filter(
+      item => item.case.currentUnitId === selectedGroupId
+    )
     .map(item => item.case)
 
-  const selectedGroup = groups.find(g => g.unitId === selectedGroupId)
+  const selectedGroup = groups.find(
+    g => g.unitId === selectedGroupId
+  )
 
-  // Cases this directorate sent to ANOTHER DIRECTORATE — the only
-  // destination type that means "transfer" for a Directorate sender.
-  // Casing normalized defensively in case the backend or serializer
-  // ever returns anything other than the exact enum string.
+  // ============================================================
+  // TRANSFERS
+  // Cases this directorate sent to another directorate
+  // ============================================================
+
   const transfers: TransferEvent[] = previouslyHandled
     .filter(
       item =>
-        item.lastWorkflowAction.toUnit?.unitType?.toUpperCase() === 'DIRECTORATE'
+        item.lastWorkflowAction.toUnit?.unitType?.toUpperCase() ===
+        'DIRECTORATE'
     )
     .map(item => ({
       assignmentId: item.lastWorkflowAction.assignmentId,
       trackingNumber: item.case.trackingNumber,
-      toUnitName: item.lastWorkflowAction.toUnit?.name ?? 'Unknown directorate',
+      toUnitName:
+        item.lastWorkflowAction.toUnit?.name ??
+        'Unknown directorate',
       remarks: item.lastWorkflowAction.remarks,
       createdAt: item.lastWorkflowAction.assignedAt,
     }))
 
-  function openCase(c: CaseRecord, readOnly = false) {
+  // ============================================================
+  // OPEN CASE
+  // ============================================================
+
+  function openCase(
+    c: CaseRecord,
+    readOnly = false
+  ) {
     setSelectedCase(c)
     setViewOnly(readOnly)
     setPage('case-detail')
     setCaseTab('Overview')
   }
 
+  // ============================================================
+  // OPEN GROUP CASES
+  // ============================================================
+
   function openGroupCases(unitId: string) {
     setSelectedGroupId(unitId)
     setPage('group-cases')
   }
+
+  // ============================================================
+  // CASE DETAIL PAGE
+  // ============================================================
 
   if (page === 'case-detail' && selectedCase) {
     return (
@@ -176,7 +309,9 @@ export default function DirectoratePage({ page, setPage, directorateName, direct
         onBack={() => {
           setSelectedCase(null)
           setViewOnly(false)
-          setPage(viewOnly ? 'group-cases' : 'cases')
+          setPage(
+            viewOnly ? 'group-cases' : 'cases'
+          )
         }}
         role="directorate"
         onActionComplete={() => {
@@ -190,31 +325,71 @@ export default function DirectoratePage({ page, setPage, directorateName, direct
     )
   }
 
-  const statuses = ['All', 'Submitted', 'In Progress', 'Pending Clarification', 'Returned', 'Approved', 'Rejected', 'Archived']
+  // ============================================================
+  // STATUS FILTERS
+  // ============================================================
+
+  const statuses = [
+    'All',
+    'Submitted',
+    'In Progress',
+    'Pending Clarification',
+    'Returned',
+    'Approved',
+    'Rejected',
+    'Archived',
+  ]
 
   const filteredCases = dirCases
-    .filter(c => filterStatus === 'All' || mapCaseToRecord(c).status === filterStatus)
+    .filter(
+      c =>
+        filterStatus === 'All' ||
+        mapCaseToRecord(c).status === filterStatus
+    )
     .map(mapCaseToRecord)
 
-  // ── All Groups (simple list, no unreliable stats) ──
+  // ============================================================
+  // GROUPS PAGE
+  // ============================================================
+
   if (page === 'groups') {
     return (
       <div className="p-6 space-y-4">
-        <h2 className="text-xl font-black text-gray-900" style={{ fontFamily: 'var(--font-display)' }}>{t('groupOverview')}</h2>
+        <h2
+          className="text-xl font-black text-gray-900"
+          style={{ fontFamily: 'var(--font-display)' }}
+        >
+          {t('groupOverview')}
+        </h2>
+
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100">
           {loadingGroups ? (
-            <div className="p-10 text-center text-sm text-gray-500">Loading groups...</div>
+            <div className="p-10 text-center text-sm text-gray-500">
+              Loading groups...
+            </div>
           ) : groups.length === 0 ? (
-            <EmptyState icon="👥" title="No groups found" sub="No groups are set up under this directorate yet." />
+            <EmptyState
+              icon="👥"
+              title="No groups found"
+              sub="No groups are set up under this directorate yet."
+            />
           ) : (
             <div className="divide-y divide-gray-50">
               {groups.map(g => (
-                <div key={g.unitId} className="px-6 py-4 hover:bg-gray-50 transition-colors flex items-center justify-between">
-                  <h3 className="font-semibold text-gray-900">{g.name}</h3>
+                <div
+                  key={g.unitId}
+                  className="px-6 py-4 hover:bg-gray-50 transition-colors flex items-center justify-between"
+                >
+                  <h3 className="font-semibold text-gray-900">
+                    {g.name}
+                  </h3>
+
                   <Btn
                     size="sm"
                     variant="secondary"
-                    onClick={() => openGroupCases(g.unitId)}
+                    onClick={() =>
+                      openGroupCases(g.unitId)
+                    }
                   >
                     View Cases
                   </Btn>
@@ -227,7 +402,10 @@ export default function DirectoratePage({ page, setPage, directorateName, direct
     )
   }
 
-  // ── Cases for one specific Group (read-only) ──
+  // ============================================================
+  // GROUP CASES PAGE
+  // ============================================================
+
   if (page === 'group-cases') {
     return (
       <div className="p-6 space-y-4">
@@ -239,16 +417,24 @@ export default function DirectoratePage({ page, setPage, directorateName, direct
             ← Back to Groups
           </button>
         </div>
-        <h2 className="text-xl font-black text-gray-900" style={{ fontFamily: 'var(--font-display)' }}>
+
+        <h2
+          className="text-xl font-black text-gray-900"
+          style={{ fontFamily: 'var(--font-display)' }}
+        >
           {selectedGroup?.name ?? 'Group'} — Cases
         </h2>
+
         <p className="text-sm text-gray-500 -mt-2">
-          Read-only view of cases currently being worked on by this group.
+          Read-only view of cases currently being worked
+          on by this group.
         </p>
 
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100">
           {loadingPreviouslyHandled ? (
-            <div className="p-10 text-center text-sm text-gray-500">Loading cases...</div>
+            <div className="p-10 text-center text-sm text-gray-500">
+              Loading cases...
+            </div>
           ) : previouslyHandledError ? (
             <div className="p-6">
               <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-sm">
@@ -256,28 +442,74 @@ export default function DirectoratePage({ page, setPage, directorateName, direct
               </div>
             </div>
           ) : groupCases.length === 0 ? (
-            <EmptyState icon="📁" title="No cases here" sub="This group has no cases assigned right now." />
+            <EmptyState
+              icon="📁"
+              title="No cases here"
+              sub="This group has no cases assigned right now."
+            />
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-gray-100">
-                    {[t('col_trackingNo'), t('col_subject'), t('col_status'), t('col_priority'), t('col_lastActivity'), ''].map(h => (
-                      <th key={h} className="text-left px-5 py-3 text-xs font-bold text-gray-400 uppercase tracking-wide">{h}</th>
+                    {[
+                      t('col_trackingNo'),
+                      t('col_subject'),
+                      t('col_status'),
+                      t('col_priority'),
+                      t('col_lastActivity'),
+                      '',
+                    ].map(h => (
+                      <th
+                        key={h}
+                        className="text-left px-5 py-3 text-xs font-bold text-gray-400 uppercase tracking-wide"
+                      >
+                        {h}
+                      </th>
                     ))}
                   </tr>
                 </thead>
+
                 <tbody>
-                  {groupCases.map(mapCaseToRecord).map(c => (
-                    <tr key={c.id} onClick={() => openCase(c, true)} className="border-b border-gray-50 hover:bg-gray-50 cursor-pointer transition-colors">
-                      <td className="px-5 py-3.5 font-mono font-semibold text-[#1E4B8F] text-xs">{c.id}</td>
-                      <td className="px-5 py-3.5 font-medium text-gray-900 max-w-[180px] truncate">{c.subject}</td>
-                      <td className="px-5 py-3.5"><StatusBadge status={c.status} /></td>
-                      <td className="px-5 py-3.5"><PriorityBadge priority={c.priority} /></td>
-                      <td className="px-5 py-3.5 text-xs text-gray-400">{c.lastActivity}</td>
-                      <td className="px-5 py-3.5"><button className="text-xs text-[#1E4B8F] font-semibold hover:underline">View</button></td>
-                    </tr>
-                  ))}
+                  {groupCases
+                    .map(mapCaseToRecord)
+                    .map(c => (
+                      <tr
+                        key={c.id}
+                        onClick={() =>
+                          openCase(c, true)
+                        }
+                        className="border-b border-gray-50 hover:bg-gray-50 cursor-pointer transition-colors"
+                      >
+                        <td className="px-5 py-3.5 font-mono font-semibold text-[#1E4B8F] text-xs">
+                          {c.id}
+                        </td>
+
+                        <td className="px-5 py-3.5 font-medium text-gray-900 max-w-[180px] truncate">
+                          {c.subject}
+                        </td>
+
+                        <td className="px-5 py-3.5">
+                          <StatusBadge status={c.status} />
+                        </td>
+
+                        <td className="px-5 py-3.5">
+                          <PriorityBadge
+                            priority={c.priority}
+                          />
+                        </td>
+
+                        <td className="px-5 py-3.5 text-xs text-gray-400">
+                          {c.lastActivity}
+                        </td>
+
+                        <td className="px-5 py-3.5">
+                          <button className="text-xs text-[#1E4B8F] font-semibold hover:underline">
+                            View
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
                 </tbody>
               </table>
             </div>
@@ -287,18 +519,30 @@ export default function DirectoratePage({ page, setPage, directorateName, direct
     )
   }
 
-  // ── Transfers (read-only, cases this directorate sent to another directorate) ──
+  // ============================================================
+  // TRANSFERS PAGE
+  // ============================================================
+
   if (page === 'transfers') {
     return (
       <div className="p-6 space-y-4">
-        <h2 className="text-xl font-black text-gray-900" style={{ fontFamily: 'var(--font-display)' }}>Transferred Cases</h2>
+        <h2
+          className="text-xl font-black text-gray-900"
+          style={{ fontFamily: 'var(--font-display)' }}
+        >
+          Transferred Cases
+        </h2>
+
         <p className="text-sm text-gray-500 -mt-2">
-          Read-only history of cases this directorate has transferred to another directorate.
+          Read-only history of cases this directorate
+          has transferred to another directorate.
         </p>
 
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100">
           {loadingPreviouslyHandled ? (
-            <div className="p-10 text-center text-sm text-gray-500">Loading transfer history...</div>
+            <div className="p-10 text-center text-sm text-gray-500">
+              Loading transfer history...
+            </div>
           ) : previouslyHandledError ? (
             <div className="p-6">
               <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-sm">
@@ -306,25 +550,54 @@ export default function DirectoratePage({ page, setPage, directorateName, direct
               </div>
             </div>
           ) : transfers.length === 0 ? (
-            <EmptyState icon="⇄" title="No transfers yet" sub="This directorate hasn't transferred any cases to another directorate." />
+            <EmptyState
+              icon="⇄"
+              title="No transfers yet"
+              sub="This directorate hasn't transferred any cases to another directorate."
+            />
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-gray-100">
-                    {['Tracking No', 'Transferred To', 'Remark', 'Date'].map(h => (
-                      <th key={h} className="text-left px-5 py-3 text-xs font-bold text-gray-400 uppercase tracking-wide whitespace-nowrap">{h}</th>
+                    {[
+                      'Tracking No',
+                      'Transferred To',
+                      'Remark',
+                      'Date',
+                    ].map(h => (
+                      <th
+                        key={h}
+                        className="text-left px-5 py-3 text-xs font-bold text-gray-400 uppercase tracking-wide whitespace-nowrap"
+                      >
+                        {h}
+                      </th>
                     ))}
                   </tr>
                 </thead>
+
                 <tbody>
                   {transfers.map(tr => (
-                    <tr key={tr.assignmentId} className="border-b border-gray-50">
-                      <td className="px-5 py-3.5 font-mono font-semibold text-[#1E4B8F] text-xs">{tr.trackingNumber}</td>
-                      <td className="px-5 py-3.5 text-gray-600">{tr.toUnitName}</td>
-                      <td className="px-5 py-3.5 text-gray-500 max-w-[220px] truncate">{tr.remarks ?? '—'}</td>
+                    <tr
+                      key={tr.assignmentId}
+                      className="border-b border-gray-50"
+                    >
+                      <td className="px-5 py-3.5 font-mono font-semibold text-[#1E4B8F] text-xs">
+                        {tr.trackingNumber}
+                      </td>
+
+                      <td className="px-5 py-3.5 text-gray-600">
+                        {tr.toUnitName}
+                      </td>
+
+                      <td className="px-5 py-3.5 text-gray-500 max-w-[220px] truncate">
+                        {tr.remarks ?? '—'}
+                      </td>
+
                       <td className="px-5 py-3.5 text-gray-400 text-xs whitespace-nowrap">
-                        {new Date(tr.createdAt).toLocaleString()}
+                        {new Date(
+                          tr.createdAt
+                        ).toLocaleString()}
                       </td>
                     </tr>
                   ))}
@@ -337,71 +610,160 @@ export default function DirectoratePage({ page, setPage, directorateName, direct
     )
   }
 
+  // ============================================================
+  // DASHBOARD
+  // ============================================================
+
   if (page === 'dashboard') {
-    const needsAssignment = dirCases.filter(c => c.status === 'SUBMITTED')
-    const awaitingDecision = dirCases.filter(c => c.status === 'UNDER_REVIEW')
+    const needsAssignment = dirCases.filter(
+      c => c.status === 'SUBMITTED'
+    )
+
+    const awaitingDecision = dirCases.filter(
+      c => c.status === 'UNDER_REVIEW'
+    )
 
     return (
       <div className="p-6 space-y-6">
         <div>
-          <h1 className="text-2xl font-black text-gray-900" style={{ fontFamily: 'var(--font-display)' }}>{t('directorateDashboard')}</h1>
-          <p className="text-gray-500 text-sm">{directorateName}</p>
-        </div>
+  <h1
+    className="text-2xl font-black text-gray-900"
+    style={{ fontFamily: 'var(--font-display)' }}
+  >
+    {t('directorateDashboard')}
+  </h1>
+</div> 
 
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-          <KpiCard label={t('kpi_activeCases')} value={dirCases.length} icon="🔄" onClick={() => setPage('cases')} />
-          <KpiCard label={t('kpi_pendingGroups')} value={awaitingDecision.length} icon="⏳" accent="#D97706" onClick={() => setPage('cases')} />
-          <KpiCard label="Needs Assignment" value={needsAssignment.length} icon="📥" accent="#2563EB" onClick={() => setPage('cases')} />
+          <KpiCard
+            label={t('kpi_activeCases')}
+            value={dirCases.length}
+            icon="🔄"
+            onClick={() => setPage('cases')}
+          />
+
+          <KpiCard
+            label={t('kpi_pendingGroups')}
+            value={awaitingDecision.length}
+            icon="⏳"
+            accent="#D97706"
+            onClick={() => setPage('cases')}
+          />
+
+          <KpiCard
+            label="Needs Assignment"
+            value={needsAssignment.length}
+            icon="📥"
+            accent="#2563EB"
+            onClick={() => setPage('cases')}
+          />
         </div>
 
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
           <div className="xl:col-span-2 bg-white rounded-2xl shadow-sm border border-gray-100">
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
-              <h2 className="text-base font-bold text-gray-900" style={{ fontFamily: 'var(--font-display)' }}>{t('casesNeedingAction')}</h2>
-              <button onClick={() => setPage('cases')} className="text-xs text-[#1E4B8F] font-semibold hover:underline">{t('viewAll')}</button>
+              <h2
+                className="text-base font-bold text-gray-900"
+                style={{ fontFamily: 'var(--font-display)' }}
+              >
+                {t('casesNeedingAction')}
+              </h2>
+
+              <button
+                onClick={() => setPage('cases')}
+                className="text-xs text-[#1E4B8F] font-semibold hover:underline"
+              >
+                {t('viewAll')}
+              </button>
             </div>
+
             <div className="divide-y divide-gray-50">
-              {[...needsAssignment, ...awaitingDecision].slice(0, 4).map(c => {
-                const rec = mapCaseToRecord(c)
-                return (
-                  <div key={c.caseId} className="flex items-center gap-4 px-6 py-3.5 hover:bg-gray-50 cursor-pointer transition-colors" onClick={() => openCase(rec)}>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-0.5">
-                        <span className="font-mono text-xs font-semibold text-[#1E4B8F]">{c.trackingNumber}</span>
-                        <StatusBadge status={rec.status} />
+              {[...needsAssignment, ...awaitingDecision]
+                .slice(0, 4)
+                .map(c => {
+                  const rec = mapCaseToRecord(c)
+
+                  return (
+                    <div
+                      key={c.caseId}
+                      className="flex items-center gap-4 px-6 py-3.5 hover:bg-gray-50 cursor-pointer transition-colors"
+                      onClick={() => openCase(rec)}
+                    >
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-0.5">
+                          <span className="font-mono text-xs font-semibold text-[#1E4B8F]">
+                            {c.trackingNumber}
+                          </span>
+
+                          <StatusBadge
+                            status={rec.status}
+                          />
+                        </div>
+
+                        <p className="text-sm font-medium text-gray-800 truncate">
+                          {c.subject}
+                        </p>
                       </div>
-                      <p className="text-sm font-medium text-gray-800 truncate">{c.subject}</p>
+
+                      <Btn size="sm">
+                        {t('review')}
+                      </Btn>
                     </div>
-                    <Btn size="sm">{t('review')}</Btn>
+                  )
+                })}
+
+              {needsAssignment.length === 0 &&
+                awaitingDecision.length === 0 && (
+                  <div className="px-6 py-8 text-center text-sm text-gray-400">
+                    No cases need action right now.
                   </div>
-                )
-              })}
-              {needsAssignment.length === 0 && awaitingDecision.length === 0 && (
-                <div className="px-6 py-8 text-center text-sm text-gray-400">No cases need action right now.</div>
-              )}
+                )}
             </div>
           </div>
 
-          {/* ── Group Overview widget (names only, no stats) ── */}
+          {/* ── Group Overview widget ── */}
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100">
             <div className="px-6 py-4 border-b border-gray-100">
-              <h2 className="text-base font-bold text-gray-900" style={{ fontFamily: 'var(--font-display)' }}>{t('groupOverview')}</h2>
+              <h2
+                className="text-base font-bold text-gray-900"
+                style={{
+                  fontFamily: 'var(--font-display)',
+                }}
+              >
+                {t('groupOverview')}
+              </h2>
             </div>
+
             <div className="divide-y divide-gray-50">
               {loadingGroups ? (
-                <div className="px-6 py-8 text-center text-sm text-gray-400">Loading groups...</div>
+                <div className="px-6 py-8 text-center text-sm text-gray-400">
+                  Loading groups...
+                </div>
               ) : groups.length === 0 ? (
-                <div className="px-6 py-8 text-center text-sm text-gray-400">No groups found.</div>
+                <div className="px-6 py-8 text-center text-sm text-gray-400">
+                  No groups found.
+                </div>
               ) : (
                 groups.map(g => (
-                  <div key={g.unitId} className="px-6 py-4">
-                    <p className="text-sm font-bold text-gray-800">{g.name}</p>
+                  <div
+                    key={g.unitId}
+                    className="px-6 py-4"
+                  >
+                    <p className="text-sm font-bold text-gray-800">
+                      {g.name}
+                    </p>
                   </div>
                 ))
               )}
             </div>
+
             <div className="px-6 py-3 border-t border-gray-50">
-              <button onClick={() => setPage('groups')} className="text-xs text-[#1E4B8F] font-semibold hover:underline">{t('manageGroups')}</button>
+              <button
+                onClick={() => setPage('groups')}
+                className="text-xs text-[#1E4B8F] font-semibold hover:underline"
+              >
+                {t('manageGroups')}
+              </button>
             </div>
           </div>
         </div>
@@ -409,48 +771,108 @@ export default function DirectoratePage({ page, setPage, directorateName, direct
     )
   }
 
-  // ── Cases list ──
+  // ============================================================
+  // CASES LIST
+  // ============================================================
+
   return (
     <div className="p-6 space-y-4">
-      <h2 className="text-xl font-black text-gray-900" style={{ fontFamily: 'var(--font-display)' }}>{t('cases')}</h2>
+      <h2
+        className="text-xl font-black text-gray-900"
+        style={{ fontFamily: 'var(--font-display)' }}
+      >
+        {t('cases')}
+      </h2>
 
       <div className="flex gap-2 flex-wrap">
         {statuses.map(s => (
-          <button key={s} onClick={() => setFilterStatus(s)}
-            className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-all ${filterStatus === s ? 'bg-[#1E4B8F] text-white' : 'bg-white border border-gray-200 text-gray-600 hover:border-gray-300'}`}>
+          <button
+            key={s}
+            onClick={() => setFilterStatus(s)}
+            className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-all ${
+              filterStatus === s
+                ? 'bg-[#1E4B8F] text-white'
+                : 'bg-white border border-gray-200 text-gray-600 hover:border-gray-300'
+            }`}
+          >
             {s}
           </button>
         ))}
       </div>
 
       {casesError && (
-        <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-sm">{casesError}</div>
+        <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-sm">
+          {casesError}
+        </div>
       )}
 
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100">
         {loadingCases ? (
-          <div className="p-10 text-center text-sm text-gray-500">Loading cases...</div>
+          <div className="p-10 text-center text-sm text-gray-500">
+            Loading cases...
+          </div>
         ) : filteredCases.length === 0 ? (
-          <EmptyState icon="📁" title={t('empty_noCases')} />
+          <EmptyState
+            icon="📁"
+            title={t('empty_noCases')}
+          />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-gray-100">
-                  {[t('col_trackingNo'), t('col_subject'), t('col_status'), t('col_priority'), t('col_lastActivity'), ''].map(h => (
-                    <th key={h} className="text-left px-5 py-3 text-xs font-bold text-gray-400 uppercase tracking-wide">{h}</th>
+                  {[
+                    t('col_trackingNo'),
+                    t('col_subject'),
+                    t('col_status'),
+                    t('col_priority'),
+                    t('col_lastActivity'),
+                    '',
+                  ].map(h => (
+                    <th
+                      key={h}
+                      className="text-left px-5 py-3 text-xs font-bold text-gray-400 uppercase tracking-wide"
+                    >
+                      {h}
+                    </th>
                   ))}
                 </tr>
               </thead>
+
               <tbody>
                 {filteredCases.map(c => (
-                  <tr key={c.id} onClick={() => openCase(c)} className="border-b border-gray-50 hover:bg-gray-50 cursor-pointer transition-colors">
-                    <td className="px-5 py-3.5 font-mono font-semibold text-[#1E4B8F] text-xs">{c.id}</td>
-                    <td className="px-5 py-3.5 font-medium text-gray-900 max-w-[180px] truncate">{c.subject}</td>
-                    <td className="px-5 py-3.5"><StatusBadge status={c.status} /></td>
-                    <td className="px-5 py-3.5"><PriorityBadge priority={c.priority} /></td>
-                    <td className="px-5 py-3.5 text-xs text-gray-400">{c.lastActivity}</td>
-                    <td className="px-5 py-3.5"><button className="text-xs text-[#1E4B8F] font-semibold hover:underline">{t('review')}</button></td>
+                  <tr
+                    key={c.id}
+                    onClick={() => openCase(c)}
+                    className="border-b border-gray-50 hover:bg-gray-50 cursor-pointer transition-colors"
+                  >
+                    <td className="px-5 py-3.5 font-mono font-semibold text-[#1E4B8F] text-xs">
+                      {c.id}
+                    </td>
+
+                    <td className="px-5 py-3.5 font-medium text-gray-900 max-w-[180px] truncate">
+                      {c.subject}
+                    </td>
+
+                    <td className="px-5 py-3.5">
+                      <StatusBadge status={c.status} />
+                    </td>
+
+                    <td className="px-5 py-3.5">
+                      <PriorityBadge
+                        priority={c.priority}
+                      />
+                    </td>
+
+                    <td className="px-5 py-3.5 text-xs text-gray-400">
+                      {c.lastActivity}
+                    </td>
+
+                    <td className="px-5 py-3.5">
+                      <button className="text-xs text-[#1E4B8F] font-semibold hover:underline">
+                        {t('review')}
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>

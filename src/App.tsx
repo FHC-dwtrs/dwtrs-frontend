@@ -165,8 +165,6 @@ export default function App() {
               <SectorPage
                 page={page}
                 setPage={setPage}
-                sectorName={unitName}
-                sectorUnitId={authUser?.unit?.id ?? ''}
               />
             )}
 
@@ -178,8 +176,8 @@ export default function App() {
               <DirectoratePage
                 page={page}
                 setPage={setPage}
-                directorateName={unitName}
-                directorateUnitId={authUser?.unit?.id ?? ''}
+               // directorateName={unitName}
+               // directorateUnitId={authUser?.unit?.id ?? ''}
 
               />
             )}
