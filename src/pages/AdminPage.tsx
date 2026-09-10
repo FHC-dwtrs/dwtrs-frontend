@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { KpiCard, Btn, Modal, Input, Select } from '../components/ui'
 import { useLanguage } from '../i18n'
+import { NotificationsPageView } from '../components/notifications'
 import {
   getOrganizations,
   getOrganization,
@@ -87,6 +88,12 @@ const [activeUsers, setActiveUsers] = useState(0)
   if (page === 'audit') return <AuditPage />
   if (page === 'roles') return <RolesPage />
   if (page === 'settings') return <SettingsPage />
+
+  // ============================================================
+  // NOTIFICATIONS (real API) — no case deep-link for admin
+  // ============================================================
+
+  if (page === 'notifications') return <NotificationsPageView />
 
 
   const sectorCount = orgUnits.filter(u => u.unitType === 'SECTOR').length

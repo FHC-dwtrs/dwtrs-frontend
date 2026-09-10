@@ -1,5 +1,6 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import type { AuthUser, Role } from './types'
+import { getMe } from './api/auth.api'
 import { LangProvider } from './i18n'
 import { Sidebar, TopBar } from './components/layout'
 import PublicPage from './pages/PublicPage'
@@ -71,6 +72,36 @@ export default function App() {
   }
 
   // ----------------------------------------------------------
+  // Refresh current user from GET /auth/me so the profile
+  // (name + unit) shown in the sidebar/topbar is always the
+  // real one, even if the login payload omits the unit object.
+  // ----------------------------------------------------------
+
+  useEffect(() => {
+    if (view !== 'dashboard') return
+
+    let cancelled = false
+
+    async function refreshCurrentUser() {
+      try {
+        const result = await getMe()
+
+        if (!cancelled && result.user) {
+          setAuthUser(result.user)
+        }
+      } catch (err) {
+        console.error('Failed to refresh current user:', err)
+      }
+    }
+    
+    refreshCurrentUser()
+
+    return () => {
+      cancelled = true
+    }
+  }, [view])
+
+  // ----------------------------------------------------------
   // LOGOUT
   // ----------------------------------------------------------
 
@@ -132,6 +163,7 @@ export default function App() {
       <div className="flex h-screen overflow-hidden bg-[#F7F8FA]">
         <Sidebar
           role={role}
+          userName={authUser?.name}
           unitName={unitName}
           page={page}
           setPage={setPage}
@@ -141,6 +173,7 @@ export default function App() {
         <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
           <TopBar
             role={role}
+            userName={authUser?.name}
             unitName={unitName}
             pageTitle={page}
           />

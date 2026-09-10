@@ -54,6 +54,8 @@ import {
 
 import type { CaseHistoryEntry, CaseRecord, CaseRemarkItem } from '../types'
 import { useLanguage } from '../i18n'
+import { getCaseById } from '../api/cases.api'
+import { NotificationsPageView } from '../components/notifications'
 
 interface Props {
   page: string
@@ -223,6 +225,28 @@ export default function RecordsPage({ page, setPage }: Props) {
         onSuccess={() => {
           loadCases()
           setPage('cases')
+        }}
+      />
+    )
+  }
+
+  // ─────────────────────────────────────────────
+  // NOTIFICATIONS (real API)
+  // ─────────────────────────────────────────────
+
+  if (page === 'notifications') {
+    return (
+      <NotificationsPageView
+        onOpenCase={async caseId => {
+          try {
+            const res = await getCaseById(caseId)
+
+            if (res.data) {
+              openCase(mapCaseToRecord(res.data))
+            }
+          } catch (err) {
+            console.error('Failed to open case from notification:', err)
+          }
         }}
       />
     )
@@ -450,7 +474,7 @@ onArchive={(archived) => {
         <div className="bg-gradient-to-r from-[#1E4B8F] to-[#2558A8] rounded-2xl p-6 text-white flex items-center justify-between">
           <div>
             <p className="text-blue-200 text-sm font-semibold mb-1">
-              {t('goodMorning')}, Sara
+              {t('goodMorning')}, Archive staff
             </p>
 
             <h1
@@ -478,12 +502,12 @@ onArchive={(archived) => {
         {/* KPIs */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
 
-          <KpiCard
+         {/*  <KpiCard
             label={t('kpi_registeredToday')}
             value={registeredToday}
             icon="📋"
             sub="Today"
-          />
+          />*/}
 
           <KpiCard
             label={t('kpi_totalActive')}
@@ -3150,7 +3174,7 @@ async function confirmTransfer() {
                   </Btn>
 
                   {c.rawStatus ===
-                    'SENT_BACK_FOR_CORRECTION' && (
+                    'RETURNED' && (
                     <Btn
                       size="sm"
                       variant="secondary"

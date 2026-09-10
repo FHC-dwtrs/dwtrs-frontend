@@ -11,6 +11,8 @@ import {
 import { CaseDetail } from './RecordsPage'
 import type { CaseRecord } from '../types'
 import { useLanguage } from '../i18n'
+import { getCaseById } from '../api/cases.api'
+import { NotificationsPageView } from '../components/notifications'
 
 interface Props {
   page: string
@@ -88,6 +90,28 @@ export default function GroupPage({ page, setPage }: Props) {
     setSelectedCase(c)
     setPage('case-detail')
     setCaseTab('Overview')
+  }
+
+  // ---------------------------------------------------------
+  // NOTIFICATIONS (real API)
+  // ---------------------------------------------------------
+
+  if (page === 'notifications') {
+    return (
+      <NotificationsPageView
+        onOpenCase={async caseId => {
+          try {
+            const res = await getCaseById(caseId)
+
+            if (res.data) {
+              openCase(mapCaseToRecord(res.data))
+            }
+          } catch (err) {
+            console.error('Failed to open case from notification:', err)
+          }
+        }}
+      />
+    )
   }
 
   // ---------------------------------------------------------

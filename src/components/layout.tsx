@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { Role } from '../types'
 import { useLanguage, LangToggle, type TKey } from '../i18n'
+import { NotificationBell } from './notifications'
 
 // ── Sidebar config per role ────────────────────────────
 type NavItem = { labelKey: TKey; icon: string; page: string; children?: NavItem[] }
@@ -83,17 +84,10 @@ const ROLE_LABELS: Record<Role, string> = {
   admin: 'System Administration',
 }
 
-const ROLE_USER: Record<Role, string> = {
-  records: 'Sara Haile',
-  sector: 'Yonas Tesfaye',
-  directorate: 'Meron Alemu',
-  group: 'Daniel Girma',
-  admin: 'System Admin',
-}
-
 // ── Sidebar ────────────────────────────────────────────
 interface SidebarProps {
   role: Role
+  userName?: string
   unitName?: string
   page: string
   setPage: (p: string) => void
@@ -101,12 +95,12 @@ interface SidebarProps {
   collapsed?: boolean
 }
 
-export function Sidebar({ role, unitName, page, setPage, onLogout, collapsed = false }: SidebarProps) {
+export function Sidebar({ role, userName, unitName, page, setPage, onLogout, collapsed = false }: SidebarProps) {
   const { t } = useLanguage()
   const [expanded, setExpanded] = useState<Record<string, boolean>>({ cases: true, org: false })
   const nav = NAV[role]
   const displayUnit = unitName || ROLE_LABELS[role]
-  const displayUser = ROLE_USER[role]
+  const displayUser = userName || 'User'
 
   return (
     <aside className={`flex flex-col bg-[#1E4B8F] text-white ${collapsed ? 'w-16' : 'w-64'} flex-shrink-0 min-h-screen transition-all duration-200`}>
@@ -197,16 +191,16 @@ export function Sidebar({ role, unitName, page, setPage, onLogout, collapsed = f
 // ── TopBar ─────────────────────────────────────────────
 interface TopBarProps {
   role: Role
+  userName?: string
   unitName?: string
   pageTitle: string
   onSearch?: (q: string) => void
 }
 
-export function TopBar({ role, unitName, pageTitle, onSearch }: TopBarProps) {
+export function TopBar({ role, userName, unitName, pageTitle, onSearch }: TopBarProps) {
   const { t } = useLanguage()
-  const [notifOpen, setNotifOpen] = useState(false)
   const displayUnit = unitName || ROLE_LABELS[role]
-  const displayUser = ROLE_USER[role]
+  const displayUser = userName || 'User'
 
   return (
     <header className="h-16 bg-white border-b border-gray-200 flex items-center px-6 gap-4 flex-shrink-0 sticky top-0 z-20">
@@ -225,29 +219,8 @@ export function TopBar({ role, unitName, pageTitle, onSearch }: TopBarProps) {
         {/* Language toggle */}
         <LangToggle className="border-gray-200 text-gray-500 hover:border-[#1E4B8F] hover:text-[#1E4B8F] bg-white hidden sm:inline-flex" />
 
-        {/* Notifications */}
-        <div className="relative">
-          <button
-            onClick={() => setNotifOpen(o => !o)}
-            className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors relative"
-          >
-            <span className="text-base">🔔</span>
-            <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full" />
-          </button>
-          {notifOpen && (
-            <div className="absolute right-0 top-11 w-80 bg-white rounded-xl shadow-xl border border-gray-100 z-50">
-              <div className="px-4 py-3 border-b border-gray-100">
-                <p className="text-sm font-bold text-gray-900" style={{ fontFamily: 'var(--font-display)' }}>{t('notifications')}</p>
-              </div>
-              {NOTIFS[role]?.map((n, i) => (
-                <div key={i} className="px-4 py-3 border-b border-gray-50 hover:bg-gray-50 transition-colors">
-                  <p className="text-xs text-gray-700 leading-relaxed">{n.text}</p>
-                  <p className="text-xs text-gray-400 mt-1">{n.time}</p>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+        {/* Notifications — real API, unread badge, recent dropdown */}
+        <NotificationBell />
 
         {/* User */}
         <div className="flex items-center gap-2">
@@ -262,33 +235,4 @@ export function TopBar({ role, unitName, pageTitle, onSearch }: TopBarProps) {
       </div>
     </header>
   )
-}
-
-const NOTIFS: Record<Role, { text: string; time: string }[]> = {
-  records: [
-    { text: 'Case FHC-2026-006 has been successfully registered.', time: '30 minutes ago' },
-    { text: 'Document upload required for FHC-2026-004.', time: '2 hours ago' },
-    { text: 'FHC-2026-002 moved to Housing Development Sector.', time: 'Aug 14, 2026' },
-  ],
-  sector: [
-    { text: 'New case FHC-2026-006 received from Records & Archive.', time: '30 minutes ago' },
-    { text: 'Directorate A transferred FHC-2026-007 to Directorate B.', time: '1 hour ago' },
-    { text: 'FHC-2026-001 is ready for final decision.', time: '2 hours ago' },
-    { text: 'FHC-2026-007 has been flagged as delayed (12 days).', time: 'Aug 14, 2026' },
-  ],
-  directorate: [
-    { text: 'Group A1 has completed work on FHC-2026-001.', time: '1 hour ago' },
-    { text: 'New case FHC-2026-006 assigned from Sector.', time: '3 hours ago' },
-    { text: 'FHC-2026-004 has been returned by Group A2.', time: '4 hours ago' },
-  ],
-  group: [
-    { text: 'New case FHC-2026-006 assigned to Group A1.', time: '3 hours ago' },
-    { text: 'Directorate A added a remark on FHC-2026-001.', time: '5 hours ago' },
-    { text: 'FHC-2026-004 has been returned for additional work.', time: 'Aug 14, 2026' },
-  ],
-  admin: [
-    { text: 'New user account created: sara.h', time: '1 hour ago' },
-    { text: 'User almaz.b password has been reset.', time: '2 hours ago' },
-    { text: 'Organizational unit "Group A2" added.', time: '3 hours ago' },
-  ],
 }

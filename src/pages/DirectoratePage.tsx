@@ -20,6 +20,8 @@ import {
   type PreviouslyHandledCaseItem,
 } from '../api/workflow.api'
 import { getMe, type MeUser } from '../api/auth.api'
+import { getCaseById } from '../api/cases.api'
+import { NotificationsPageView } from '../components/notifications'
 
 interface Props {
   page: string
@@ -294,6 +296,28 @@ export default function DirectoratePage({ page, setPage }: Props) {
   function openGroupCases(unitId: string) {
     setSelectedGroupId(unitId)
     setPage('group-cases')
+  }
+
+  // ============================================================
+  // NOTIFICATIONS (real API)
+  // ============================================================
+
+  if (page === 'notifications') {
+    return (
+      <NotificationsPageView
+        onOpenCase={async caseId => {
+          try {
+            const res = await getCaseById(caseId)
+
+            if (res.data) {
+              openCase(mapCaseToRecord(res.data))
+            }
+          } catch (err) {
+            console.error('Failed to open case from notification:', err)
+          }
+        }}
+      />
+    )
   }
 
   // ============================================================

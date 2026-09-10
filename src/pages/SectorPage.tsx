@@ -56,6 +56,9 @@ import {
   type MeUser,
 } from '../api/auth.api'
 
+import { getCaseById } from '../api/cases.api'
+import { NotificationsPageView } from '../components/notifications'
+
 // ============================================================
 // PROPS
 // ============================================================
@@ -829,6 +832,28 @@ export default function SectorPage({
           {userError}
         </div>
       </div>
+    )
+  }
+
+  // ============================================================
+  // NOTIFICATIONS (real API)
+  // ============================================================
+
+  if (page === 'notifications') {
+    return (
+      <NotificationsPageView
+        onOpenCase={async caseId => {
+          try {
+            const res = await getCaseById(caseId)
+
+            if (res.data) {
+              openCase(mapCaseToRecord(res.data))
+            }
+          } catch (err) {
+            console.error('Failed to open case from notification:', err)
+          }
+        }}
+      />
     )
   }
 

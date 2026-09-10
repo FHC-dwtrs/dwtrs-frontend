@@ -372,6 +372,14 @@ const T = {
     sys_storage: 'File Storage',
     sys_notif: 'Notifications',
 
+    // ── Notifications panel ─────────────────────────────
+    notif_markAllRead: 'Mark all as read',
+    notif_empty: 'No notifications',
+    notif_emptySub: 'You are all caught up.',
+    notif_loadError: 'Failed to load notifications.',
+    notif_viewCase: 'View case',
+    notif_unread: 'unread',
+
       // ... other translations
   previousHandled: "Previous Handled",
   noPreviousUnitFound: 'No previous unit found for this case yet.',
@@ -745,6 +753,14 @@ reassign: 'Reassign',
     sys_backend: 'የበስተጀርባ አገልግሎቶች',
     sys_storage: 'ፋይል ማከማቻ',
     sys_notif: 'ማሳወቂያዎች',
+
+    // ── Notifications panel ─────────────────────────────
+    notif_markAllRead: 'ሁሉንም እንደተነበብ ምልክት ያድርጉ',
+    notif_empty: 'ማሳወቂያ የለም',
+    notif_emptySub: 'ሁሉም ነገር ተጠናቋል።',
+    notif_loadError: 'ማሳወቂያዎችን መጫን አልተቻለም።',
+    notif_viewCase: 'ጉዳዩን ይመልከቱ',
+    notif_unread: 'ያልተነበቡ',
 
      // ... other translations
   previousHandled: "ቀደም ሲል የተያዙ",
