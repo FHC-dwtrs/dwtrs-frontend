@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { Role } from '../types'
 import { useLanguage, LangToggle, type TKey } from '../i18n'
 import { NotificationBell } from './notifications'
+import logo from '../assets/fhc-logo.png'
 
 // ── Sidebar config per role ────────────────────────────
 type NavItem = { labelKey: TKey; icon: string; page: string; children?: NavItem[] }
@@ -103,16 +104,23 @@ export function Sidebar({ role, userName, unitName, page, setPage, onLogout, col
   const displayUser = userName || 'User'
 
   return (
-    <aside className={`flex flex-col bg-[#1E4B8F] text-white ${collapsed ? 'w-16' : 'w-64'} flex-shrink-0 min-h-screen transition-all duration-200`}>
+    <aside className={`flex flex-col bg-[#416A7A] text-white ${collapsed ? 'w-16' : 'w-64'} flex-shrink-0 min-h-screen transition-all duration-200`}>
       {/* Logo */}
       <div className="px-5 py-5 border-b border-white/10">
         {collapsed ? (
-          <div className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center font-black text-sm">F</div>
+          <div className="w-8 h-8 bg-white rounded-lg overflow-hidden ring-1 ring-white/30 flex-shrink-0">
+            <img src={logo} alt="FHC" className="w-full h-full object-cover" />
+          </div>
         ) : (
-          <>
-            <div className="text-lg font-black tracking-tight" style={{ fontFamily: 'var(--font-display)' }}>FHC DWTRS</div>
-            <div className="text-xs text-blue-200 mt-0.5 leading-snug">{displayUnit}</div>
-          </>
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 bg-white rounded-lg overflow-hidden ring-1 ring-white/30 flex-shrink-0">
+              <img src={logo} alt="FHC" className="w-full h-full object-cover" />
+            </div>
+            <div className="min-w-0">
+              <div className="text-lg font-black tracking-tight" style={{ fontFamily: 'var(--font-display)' }}>FHC DWTRS</div>
+              <div className="text-xs text-blue-200 mt-0.5 leading-snug">{displayUnit}</div>
+            </div>
+          </div>
         )}
       </div>
 
@@ -211,20 +219,20 @@ export function TopBar({ role, userName, unitName, pageTitle, onSearch }: TopBar
           type="text"
           placeholder={`${t('search')}…`}
           onChange={e => onSearch?.(e.target.value)}
-          className="w-full pl-9 pr-4 py-2 text-sm bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1E4B8F]/20 focus:border-[#1E4B8F] focus:bg-white transition-all"
+          className="w-full pl-9 pr-4 py-2 text-sm bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#416A7A]/20 focus:border-[#416A7A] focus:bg-white transition-all"
         />
       </div>
 
       <div className="ml-auto flex items-center gap-3">
         {/* Language toggle */}
-        <LangToggle className="border-gray-200 text-gray-500 hover:border-[#1E4B8F] hover:text-[#1E4B8F] bg-white hidden sm:inline-flex" />
+        <LangToggle className="border-gray-200 text-gray-500 hover:border-[#416A7A] hover:text-[#416A7A] bg-white hidden sm:inline-flex" />
 
         {/* Notifications — real API, unread badge, recent dropdown */}
         <NotificationBell />
 
         {/* User */}
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-full bg-[#1E4B8F] flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+          <div className="w-8 h-8 rounded-full bg-[#416A7A] flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
             {displayUser[0]}
           </div>
           <div className="hidden sm:block max-w-[180px]">

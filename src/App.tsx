@@ -160,7 +160,7 @@ export default function App() {
 
   return (
     <LangProvider>
-      <div className="flex h-screen overflow-hidden bg-[#F7F8FA]">
+      <div className="flex h-screen overflow-hidden bg-[#F7F9FA]">
         <Sidebar
           role={role}
           userName={authUser?.name}

@@ -203,7 +203,7 @@ export function NotificationBell({
             {unreadCount > 0 && (
               <button
                 onClick={markAll}
-                className="text-xs text-[#1E4B8F] hover:underline font-medium"
+                className="text-xs text-[#416A7A] hover:underline font-medium"
               >
                 {t('notif_markAllRead')}
               </button>
@@ -260,7 +260,7 @@ export function NotificationBell({
                 </span>
 
                 {!n.isRead && (
-                  <span className="w-2 h-2 rounded-full bg-[#1E4B8F] flex-shrink-0 mt-1.5" />
+                  <span className="w-2 h-2 rounded-full bg-[#416A7A] flex-shrink-0 mt-1.5" />
                 )}
               </button>
             ))}
@@ -272,7 +272,7 @@ export function NotificationBell({
                 setOpen(false)
                 onOpenPage()
               }}
-              className="w-full py-2.5 text-xs font-semibold text-[#1E4B8F] hover:bg-gray-50 transition-colors border-t border-gray-100"
+              className="w-full py-2.5 text-xs font-semibold text-[#416A7A] hover:bg-gray-50 transition-colors border-t border-gray-100"
             >
               {t('notifications')}
             </button>
@@ -337,7 +337,7 @@ export function NotificationsPageView({
         {unreadCount > 0 && (
           <button
             onClick={markAll}
-            className="px-3 py-2 text-xs font-semibold text-[#1E4B8F] border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+            className="px-3 py-2 text-xs font-semibold text-[#416A7A] border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
           >
             {t('notif_markAllRead')}
           </button>
@@ -392,7 +392,7 @@ export function NotificationsPageView({
                 </p>
 
                 {!n.isRead && (
-                  <span className="text-[10px] font-bold uppercase tracking-wide bg-[#1E4B8F] text-white px-1.5 py-0.5 rounded">
+                  <span className="text-[10px] font-bold uppercase tracking-wide bg-[#416A7A] text-white px-1.5 py-0.5 rounded">
                     New
                   </span>
                 )}
@@ -422,7 +422,7 @@ export function NotificationsPageView({
               {n.caseId && onOpenCase && (
                 <button
                   onClick={() => handleClick(n)}
-                  className="text-xs font-semibold text-[#1E4B8F] border border-gray-200 px-3 py-1.5 rounded-lg hover:bg-gray-50 transition-colors"
+                  className="text-xs font-semibold text-[#416A7A] border border-gray-200 px-3 py-1.5 rounded-lg hover:bg-gray-50 transition-colors"
                 >
                   {t('notif_viewCase')}
                 </button>

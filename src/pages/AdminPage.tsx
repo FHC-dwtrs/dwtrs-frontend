@@ -119,9 +119,9 @@ const directorateCount = orgUnits.filter(u => u.unitType === 'DIRECTORATE').leng
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         
       <KpiCard label={t('kpi_totalUsers')} value={totalUsers} icon="👥" onClick={() => setPage('users')} />
-<KpiCard label={t('kpi_activeUsers')} value={activeUsers} icon="✅" accent="#16A34A" />
-<KpiCard label={t('kpi_sectors')} value={sectorCount} icon="🏢" accent="#7C3AED" onClick={() => setPage('sectors')} />
-<KpiCard label={t('kpi_directorates')} value={directorateCount} icon="🏛" accent="#2563EB" onClick={() => setPage('directorates')} />
+<KpiCard label={t('kpi_activeUsers')} value={activeUsers} icon="✅" accent="#5F8A72" />
+<KpiCard label={t('kpi_sectors')} value={sectorCount} icon="🏢" accent="#81738B" onClick={() => setPage('sectors')} />
+<KpiCard label={t('kpi_directorates')} value={directorateCount} icon="🏛" accent="#416A7A" onClick={() => setPage('directorates')} />
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
@@ -137,7 +137,7 @@ const directorateCount = orgUnits.filter(u => u.unitType === 'DIRECTORATE').leng
 
             <button
               onClick={() => setPage('audit')}
-              className="text-xs text-[#1E4B8F] font-semibold hover:underline"
+              className="text-xs text-[#416A7A] font-semibold hover:underline"
             >
               {t('viewAll')}
             </button>
@@ -477,7 +477,7 @@ function UsersPage() {
             setSearch(e.target.value)
           }
           placeholder="Search users…"
-          className="px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#1E4B8F]/20"
+          className="px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#416A7A]/20"
         />
 
         <select
@@ -485,7 +485,7 @@ function UsersPage() {
           onChange={e =>
             setSelectedRole(e.target.value)
           }
-          className="px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#1E4B8F]/20"
+          className="px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#416A7A]/20"
         >
           <option value="">
             All Roles
@@ -574,7 +574,7 @@ function UsersPage() {
                     {/* Name */}
                     <td className="px-5 py-3.5">
                       <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-[#1E4B8F] flex items-center justify-center text-white text-xs font-bold">
+                        <div className="w-8 h-8 rounded-full bg-[#416A7A] flex items-center justify-center text-white text-xs font-bold">
                           {user.name
                             .charAt(0)
                             .toUpperCase()}
@@ -882,7 +882,7 @@ function UserDetailsModal({
       <div className="space-y-5">
         {/* User Header */}
         <div className="flex items-center gap-4">
-          <div className="w-12 h-12 rounded-xl bg-[#EEF4FF] flex items-center justify-center text-xl">
+          <div className="w-12 h-12 rounded-xl bg-[#EAF1F3] flex items-center justify-center text-xl">
             👤
           </div>
 
@@ -1774,7 +1774,7 @@ function OrgPage({ tab }: { tab: string }) {
                 >
                   {/* Sector */}
                   <div
-                    className="bg-[#EEF4FF] px-5 py-3 flex items-center justify-between cursor-pointer hover:bg-[#E3EDFF] transition-colors"
+                    className="bg-[#EAF1F3] px-5 py-3 flex items-center justify-between cursor-pointer hover:bg-[#DCE7EB] transition-colors"
                     onClick={() =>
                       handleUnitClick(s.unitId)
                     }
@@ -1784,7 +1784,7 @@ function OrgPage({ tab }: { tab: string }) {
                         🏢
                       </span>
 
-                      <span className="text-sm font-bold text-[#1E4B8F]">
+                      <span className="text-sm font-bold text-[#416A7A]">
                         {s.name}
                       </span>
                     </div>
@@ -2242,7 +2242,7 @@ function OrganizationDetailsModal({
       <div className="space-y-5">
         {/* Header */}
         <div className="flex items-center gap-4">
-          <div className="w-12 h-12 rounded-xl bg-[#EEF4FF] flex items-center justify-center text-xl">
+          <div className="w-12 h-12 rounded-xl bg-[#EAF1F3] flex items-center justify-center text-xl">
             {unit.unitType === 'SECTOR'
               ? '🏢'
               : unit.unitType === 'DIRECTORATE'
@@ -2309,7 +2309,7 @@ function OrganizationDetailsModal({
                 onChange={e =>
                   setName(e.target.value)
                 }
-                className="mt-1 w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#1E4B8F]/20"
+                className="mt-1 w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#416A7A]/20"
               />
             ) : (
               <p className="text-sm text-gray-800 mt-1">
@@ -2509,7 +2509,7 @@ function AuditPage() {
             setSearch(e.target.value)
           }
           placeholder="Search logs…"
-          className="px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#1E4B8F]/20"
+          className="px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#416A7A]/20"
         />
       </div>
 

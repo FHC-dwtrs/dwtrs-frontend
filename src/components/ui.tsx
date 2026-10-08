@@ -58,7 +58,7 @@ interface KpiProps {
   onClick?: () => void
 }
 
-export function KpiCard({ label, value, icon, accent = '#1E4B8F', sub, onClick }: KpiProps) {
+export function KpiCard({ label, value, icon, accent = '#416A7A', sub, onClick }: KpiProps) {
   return (
     <button
       onClick={onClick}
@@ -93,7 +93,7 @@ export function Btn({ children, onClick, variant = 'primary', size = 'md', disab
   const base = 'inline-flex items-center justify-center gap-2 font-semibold rounded-lg transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed'
   const sizes = { sm: 'px-3 py-1.5 text-xs', md: 'px-4 py-2 text-sm', lg: 'px-6 py-3 text-base' }
   const variants = {
-    primary: 'bg-[#1E4B8F] text-white hover:bg-[#163872] focus:ring-[#1E4B8F]',
+    primary: 'bg-[#416A7A] text-white hover:bg-[#345A68] focus:ring-[#416A7A]',
     secondary: 'bg-white text-gray-700 border border-gray-200 hover:bg-gray-50 focus:ring-gray-300',
     danger: 'bg-red-600 text-white hover:bg-red-700 focus:ring-red-500',
     ghost: 'bg-transparent text-gray-600 hover:bg-gray-100 focus:ring-gray-300',
@@ -142,7 +142,7 @@ export function Input({ label, className = '', ...props }: InputProps) {
     <div className="flex flex-col gap-1">
       {label && <label className="text-xs font-semibold text-gray-600">{label}</label>}
       <input
-        className={`w-full px-3 py-2.5 rounded-lg border border-gray-200 bg-white text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#1E4B8F]/30 focus:border-[#1E4B8F] transition-all ${className}`}
+        className={`w-full px-3 py-2.5 rounded-lg border border-gray-200 bg-white text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#416A7A]/30 focus:border-[#416A7A] transition-all ${className}`}
         {...props}
       />
     </div>
@@ -158,7 +158,7 @@ export function Textarea({ label, className = '', ...props }: TextareaProps) {
       {label && <label className="text-xs font-semibold text-gray-600">{label}</label>}
       <textarea
         rows={4}
-        className={`w-full px-3 py-2.5 rounded-lg border border-gray-200 bg-white text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#1E4B8F]/30 focus:border-[#1E4B8F] transition-all resize-none ${className}`}
+        className={`w-full px-3 py-2.5 rounded-lg border border-gray-200 bg-white text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#416A7A]/30 focus:border-[#416A7A] transition-all resize-none ${className}`}
         {...props}
       />
     </div>
@@ -174,7 +174,7 @@ export function Select({ label, options, className = '', ...props }: SelectProps
     <div className="flex flex-col gap-1">
       {label && <label className="text-xs font-semibold text-gray-600">{label}</label>}
       <select
-        className={`w-full px-3 py-2.5 rounded-lg border border-gray-200 bg-white text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#1E4B8F]/30 focus:border-[#1E4B8F] transition-all ${className}`}
+        className={`w-full px-3 py-2.5 rounded-lg border border-gray-200 bg-white text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#416A7A]/30 focus:border-[#416A7A] transition-all ${className}`}
         {...props}
       >
         <option value="">Select…</option>
@@ -203,7 +203,7 @@ export function TabBar({ tabs, active, onChange }: { tabs: string[]; active: str
         <button
           key={tab}
           onClick={() => onChange(tab)}
-          className={`px-4 py-2.5 text-sm font-semibold border-b-2 -mb-px transition-colors ${active === tab ? 'border-[#1E4B8F] text-[#1E4B8F]' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+          className={`px-4 py-2.5 text-sm font-semibold border-b-2 -mb-px transition-colors ${active === tab ? 'border-[#416A7A] text-[#416A7A]' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
         >
           {tab}
         </button>
@@ -238,16 +238,16 @@ export function BarChart({ data }: { data: ChartData[] }) {
           const reH = (d.rejected / maxVal) * h
           return (
             <g key={d.month}>
-              <rect x={x} y={h - rH} width={barW} height={rH} rx={3} fill="#1E4B8F" opacity={0.9} />
-              <rect x={x + barW + gap} y={h - aH} width={barW} height={aH} rx={3} fill="#16A34A" opacity={0.85} />
-              <rect x={x + barW * 2 + gap * 2} y={h - reH} width={barW} height={reH} rx={3} fill="#DC2626" opacity={0.75} />
-              <text x={x + groupW / 2 - 8} y={h + 20} fontSize={10} fill="#6B7280" textAnchor="middle">{d.month}</text>
+              <rect x={x} y={h - rH} width={barW} height={rH} rx={3} fill="#416A7A" opacity={0.9} />
+              <rect x={x + barW + gap} y={h - aH} width={barW} height={aH} rx={3} fill="#5F8A72" opacity={0.85} />
+              <rect x={x + barW * 2 + gap * 2} y={h - reH} width={barW} height={reH} rx={3} fill="#A66C6C" opacity={0.75} />
+              <text x={x + groupW / 2 - 8} y={h + 20} fontSize={10} fill="#718087" textAnchor="middle">{d.month}</text>
             </g>
           )
         })}
       </svg>
       <div className="flex gap-5 mt-2">
-        <div className="flex items-center gap-1.5 text-xs text-gray-500"><span className="w-3 h-3 rounded-sm bg-[#1E4B8F] inline-block" />Received</div>
+        <div className="flex items-center gap-1.5 text-xs text-gray-500"><span className="w-3 h-3 rounded-sm bg-[#416A7A] inline-block" />Received</div>
         <div className="flex items-center gap-1.5 text-xs text-gray-500"><span className="w-3 h-3 rounded-sm bg-green-600 inline-block" />Approved</div>
         <div className="flex items-center gap-1.5 text-xs text-gray-500"><span className="w-3 h-3 rounded-sm bg-red-500 inline-block" />Rejected</div>
       </div>
@@ -265,7 +265,7 @@ export function CaseTimeline({ steps }: { steps: TimelineStep[] }) {
         <div key={idx} className="flex gap-4 pb-6 last:pb-0">
           <div className="flex flex-col items-center">
             <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 text-sm font-bold
-              ${step.status === 'done' ? 'bg-green-500 text-white' : step.status === 'active' ? 'bg-[#1E4B8F] text-white ring-4 ring-[#1E4B8F]/20' : 'bg-gray-200 text-gray-400'}`}>
+              ${step.status === 'done' ? 'bg-green-500 text-white' : step.status === 'active' ? 'bg-[#416A7A] text-white ring-4 ring-[#416A7A]/20' : 'bg-gray-200 text-gray-400'}`}>
               {step.status === 'done' ? '✓' : step.status === 'active' ? '●' : '○'}
             </div>
             {idx < steps.length - 1 && (

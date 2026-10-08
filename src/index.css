@@ -5,13 +5,138 @@
 @import 'tailwindcss';
 
 @theme {
-  --color-brand: #1E4B8F;
-  --color-brand-dark: #163872;
-  --color-brand-light: #2558A8;
-  --color-brand-50: #EEF4FF;
-  --color-brand-100: #DBEAFE;
-  --color-surface: #F7F8FA;
-  --color-surface-2: #EDEEF2;
+  /* ── Palette tokens ─────────────────────────────── */
+  --color-background: #F7F9FA;
+  --color-surface: #FFFFFF;
+  --color-surface-2: #F1F4F6;
+  --color-primary: #416A7A;
+  --color-primary-dark: #345A68;
+  --color-primary-light: #EAF1F3;
+  --color-text: #26343B;
+  --color-muted: #718087;
+  --color-border: #E6EAED;
+
+  --color-approved: #5F8A72;
+  --color-pending: #A88658;
+  --color-rejected: #A66C6C;
+  --color-returned: #81738B;
+  --color-assigned: #416A7A;
+
+  /* Brand aliases (legacy names) */
+  --color-brand: #416A7A;
+  --color-brand-dark: #345A68;
+  --color-brand-light: #EAF1F3;
+  --color-brand-50: #EAF1F3;
+  --color-brand-100: #DFE9ED;
+
+  /* ── Neutral ramp (background / border / muted / text) ── */
+  --color-gray-50: #F7F9FA;
+  --color-gray-100: #F1F4F6;
+  --color-gray-200: #E6EAED;
+  --color-gray-300: #D9E0E4;
+  --color-gray-400: #98A4AA;
+  --color-gray-500: #718087;
+  --color-gray-600: #5C6B72;
+  --color-gray-700: #47555C;
+  --color-gray-800: #35424A;
+  --color-gray-900: #26343B;
+  --color-gray-950: #1A242A;
+
+  /* ── Primary ramp (blue / sky → #416A7A) ── */
+  --color-blue-50: #EAF1F3;
+  --color-blue-100: #DCE7EB;
+  --color-blue-200: #CFDEE4;
+  --color-blue-300: #B6CBD3;
+  --color-blue-400: #7FA0AF;
+  --color-blue-500: #416A7A;
+  --color-blue-600: #3A5F6E;
+  --color-blue-700: #345A68;
+  --color-blue-800: #2B4C58;
+  --color-blue-900: #223D46;
+  --color-blue-950: #162A31;
+
+  --color-sky-50: #EAF1F3;
+  --color-sky-100: #DCE7EB;
+  --color-sky-200: #CFDEE4;
+  --color-sky-300: #B6CBD3;
+  --color-sky-400: #7FA0AF;
+  --color-sky-500: #416A7A;
+  --color-sky-600: #3A5F6E;
+  --color-sky-700: #345A68;
+  --color-sky-800: #2B4C58;
+  --color-sky-900: #223D46;
+
+  /* ── Approved ramp (green → #5F8A72) ── */
+  --color-green-50: #EDF4F1;
+  --color-green-100: #DEEBE5;
+  --color-green-200: #C4DCD2;
+  --color-green-300: #A0C2B5;
+  --color-green-400: #7DA797;
+  --color-green-500: #5F8A72;
+  --color-green-600: #557D67;
+  --color-green-700: #476B58;
+  --color-green-800: #3A5849;
+  --color-green-900: #2D463A;
+
+  /* ── Pending ramp (amber → #A88658) ── */
+  --color-amber-50: #F8F2E9;
+  --color-amber-100: #F0E5D2;
+  --color-amber-200: #E2D0B1;
+  --color-amber-300: #D0B78B;
+  --color-amber-400: #BC9D6A;
+  --color-amber-500: #A88658;
+  --color-amber-600: #96774D;
+  --color-amber-700: #7E643F;
+  --color-amber-800: #645033;
+  --color-amber-900: #4B3C28;
+
+  /* ── Rejected ramp (red → #A66C6C) ── */
+  --color-red-50: #F8EFEF;
+  --color-red-100: #F1E1E1;
+  --color-red-200: #E4CACA;
+  --color-red-300: #D3A7A7;
+  --color-red-400: #BC8989;
+  --color-red-500: #A66C6C;
+  --color-red-600: #975E5E;
+  --color-red-700: #844F4F;
+  --color-red-800: #6B4040;
+  --color-red-900: #533232;
+
+  /* ── Returned ramp (orange → #81738B) ── */
+  --color-orange-50: #F2F0F5;
+  --color-orange-100: #E8E4ED;
+  --color-orange-200: #D4CEDD;
+  --color-orange-300: #B9B0C7;
+  --color-orange-400: #9A8FAC;
+  --color-orange-500: #81738B;
+  --color-orange-600: #756781;
+  --color-orange-700: #655970;
+  --color-orange-800: #52485C;
+  --color-orange-900: #403949;
+
+  /* ── Violet accents (purple / indigo → #81738B) ── */
+  --color-purple-50: #F2F0F5;
+  --color-purple-100: #E8E4ED;
+  --color-purple-200: #D4CEDD;
+  --color-purple-300: #B9B0C7;
+  --color-purple-400: #9A8FAC;
+  --color-purple-500: #81738B;
+  --color-purple-600: #756781;
+  --color-purple-700: #655970;
+  --color-purple-800: #52485C;
+  --color-purple-900: #403949;
+
+  --color-indigo-50: #F2F0F5;
+  --color-indigo-100: #E8E4ED;
+  --color-indigo-200: #D4CEDD;
+  --color-indigo-300: #B9B0C7;
+  --color-indigo-400: #9A8FAC;
+  --color-indigo-500: #81738B;
+  --color-indigo-600: #756781;
+  --color-indigo-700: #655970;
+  --color-indigo-800: #52485C;
+  --color-indigo-900: #403949;
+
   --font-sans: 'Inter', system-ui, sans-serif;
   --font-display: 'Plus Jakarta Sans', system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
@@ -19,8 +144,8 @@
 
 body {
   font-family: var(--font-sans);
-  background-color: #F7F8FA;
-  color: #1F2937;
+  background-color: #F7F9FA;
+  color: #26343B;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -28,7 +153,26 @@ h1, h2, h3, h4, h5 {
   font-family: var(--font-display);
 }
 
+/* ── Login page effects ─────────────────────────── */
+@keyframes bgDrift {
+  from { transform: scale(1) translate(0, 0); }
+  to   { transform: scale(1.08) translate(-1.5%, -1%); }
+}
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
 ::-webkit-scrollbar { width: 5px; height: 5px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #D1D5DB; border-radius: 10px; }
-::-webkit-scrollbar-thumb:hover { background: #9CA3AF; }
+::-webkit-scrollbar-thumb { background: #D9E0E4; border-radius: 10px; }
+::-webkit-scrollbar-thumb:hover { background: #98A4AA; }

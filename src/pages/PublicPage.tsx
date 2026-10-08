@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { trackCase, type PublicTrackingResult } from '../api/public.api'
 import { StatusBadge } from '../components/ui'
 import { useLanguage, LangToggle } from '../i18n'
+import logo from '../assets/fhc-logo.png'
 
 interface Props {
   onGoLogin: () => void
@@ -64,24 +65,24 @@ export default function PublicPage({ onGoLogin }: Props) {
   }
 
   return (
-    <div className="min-h-screen bg-[#F7F8FA]">
+    <div className="min-h-screen bg-[#F7F9FA]">
       {/* Header */}
       <header className="bg-white border-b border-gray-100 shadow-sm">
         <div className="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 bg-[#1E4B8F] rounded-lg flex items-center justify-center">
-              <span className="text-white font-black text-sm" style={{ fontFamily: 'var(--font-display)' }}>F</span>
+            <div className="w-9 h-9 bg-white rounded-lg overflow-hidden ring-1 ring-gray-200 flex items-center justify-center">
+              <img src={logo} alt="FHC" className="w-full h-full object-cover" />
             </div>
             <div>
-              <p className="font-black text-[#1E4B8F] text-sm leading-none" style={{ fontFamily: 'var(--font-display)' }}>{t('appName')}</p>
+              <p className="font-black text-[#416A7A] text-sm leading-none" style={{ fontFamily: 'var(--font-display)' }}>{t('appName')}</p>
               <p className="text-xs text-gray-400 leading-none mt-0.5">{t('appFull')}</p>
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <LangToggle className="border-gray-200 text-gray-600 hover:border-[#1E4B8F] hover:text-[#1E4B8F] bg-white" />
+            <LangToggle className="border-gray-200 text-gray-600 hover:border-[#416A7A] hover:text-[#416A7A] bg-white" />
             <button
               onClick={onGoLogin}
-              className="text-sm text-[#1E4B8F] font-semibold hover:underline whitespace-nowrap"
+              className="text-sm text-[#416A7A] font-semibold hover:underline whitespace-nowrap"
             >
               {t('staffLogin')}
             </button>
@@ -93,8 +94,8 @@ export default function PublicPage({ onGoLogin }: Props) {
       <main className="max-w-2xl mx-auto px-6 py-16">
         {!result ? (
           <div className="text-center">
-            <div className="inline-flex items-center gap-2 bg-[#1E4B8F]/8 text-[#1E4B8F] text-xs font-semibold px-3 py-1.5 rounded-full mb-8">
-              <span className="w-2 h-2 rounded-full bg-[#1E4B8F]" />
+            <div className="inline-flex items-center gap-2 bg-[#416A7A]/8 text-[#416A7A] text-xs font-semibold px-3 py-1.5 rounded-full mb-8">
+              <span className="w-2 h-2 rounded-full bg-[#416A7A]" />
               {t('orgName')}
             </div>
 
@@ -116,12 +117,12 @@ export default function PublicPage({ onGoLogin }: Props) {
                   onChange={e => setTrackingInput(e.target.value)}
                   onKeyDown={e => e.key === 'Enter' && handleTrack()}
                   placeholder="e.g. FHC-1788128173309"
-                  className="flex-1 px-4 py-3.5 rounded-xl border-2 border-gray-200 text-gray-900 font-mono text-base placeholder-gray-300 focus:outline-none focus:border-[#1E4B8F] focus:ring-4 focus:ring-[#1E4B8F]/10 transition-all"
+                  className="flex-1 px-4 py-3.5 rounded-xl border-2 border-gray-200 text-gray-900 font-mono text-base placeholder-gray-300 focus:outline-none focus:border-[#416A7A] focus:ring-4 focus:ring-[#416A7A]/10 transition-all"
                 />
-                <button
+                 <button
                   onClick={handleTrack}
                   disabled={loading || !trackingInput.trim()}
-                  className="px-6 py-3.5 bg-[#1E4B8F] text-white font-bold rounded-xl hover:bg-[#163872] disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-2 min-w-[120px] justify-center"
+                  className="px-6 py-3.5 bg-[#416A7A] text-white font-bold rounded-xl hover:bg-[#345A68] disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-2 min-w-[120px] justify-center"
                 >
                   {loading ? (
                     <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
@@ -130,20 +131,6 @@ export default function PublicPage({ onGoLogin }: Props) {
                   )}
                 </button>
               </div>
-            </div>
-
-            <div className="grid grid-cols-3 gap-6 mt-12">
-              {[
-                { icon: '🔒', label: t('secure'), desc: t('secureDesc') },
-                { icon: '⚡', label: t('realTime'), desc: t('realTimeDesc') },
-                { icon: '📱', label: t('easyAccess'), desc: t('easyAccessDesc') },
-              ].map(s => (
-                <div key={s.label} className="text-center">
-                  <div className="text-2xl mb-2">{s.icon}</div>
-                  <p className="text-sm font-semibold text-gray-700">{s.label}</p>
-                  <p className="text-xs text-gray-400">{s.desc}</p>
-                </div>
-              ))}
             </div>
           </div>
         ) : result === 'not-found' ? (
@@ -157,7 +144,7 @@ export default function PublicPage({ onGoLogin }: Props) {
               </p>
               <button
                 onClick={() => { setResult(null); setTrackingInput('') }}
-                className="px-6 py-2.5 bg-[#1E4B8F] text-white font-semibold rounded-xl hover:bg-[#163872] transition-colors"
+                className="px-6 py-2.5 bg-[#416A7A] text-white font-semibold rounded-xl hover:bg-[#345A68] transition-colors"
               >
                 {t('tryAgain')}
               </button>
@@ -173,7 +160,7 @@ export default function PublicPage({ onGoLogin }: Props) {
             </button>
 
             <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
-              <div className={`px-8 py-6 ${result.status === 'APPROVED' || result.status === 'COMPLETED' ? 'bg-green-50 border-b border-green-100' : result.status === 'REJECTED' ? 'bg-red-50 border-b border-red-100' : 'bg-[#1E4B8F]/4 border-b border-[#1E4B8F]/10'}`}>
+              <div className={`px-8 py-6 ${result.status === 'APPROVED' || result.status === 'COMPLETED' ? 'bg-green-50 border-b border-green-100' : result.status === 'REJECTED' ? 'bg-red-50 border-b border-red-100' : 'bg-[#416A7A]/4 border-b border-[#416A7A]/10'}`}>
                 <div className="flex items-start justify-between gap-4">
                   <div>
                     <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">{t('trackingNumber')}</p>
@@ -197,7 +184,7 @@ export default function PublicPage({ onGoLogin }: Props) {
                   <div className="flex items-center gap-0">
                     {progressStages(result.status).map((stage, idx) => (
                       <div key={idx} className="flex-1 flex flex-col items-center">
-                        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold mb-2 ${stage.done ? 'bg-[#1E4B8F] text-white' : 'bg-gray-200 text-gray-400'}`}>
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold mb-2 ${stage.done ? 'bg-[#416A7A] text-white' : 'bg-gray-200 text-gray-400'}`}>
                           {stage.done ? '✓' : idx + 1}
                         </div>
                         <p className="text-xs text-center text-gray-500 leading-tight px-1">{stage.label}</p>

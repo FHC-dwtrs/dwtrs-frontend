@@ -59,13 +59,6 @@ const T = {
     copyright: '© 2026 Federal Housing Corporation. All rights reserved.',
     version: 'DWTRS v1.0',
     tryExample: 'Try:',
-    // Trust signals
-    secure: 'Secure',
-    secureDesc: 'Your data is protected',
-    realTime: 'Real-time',
-    realTimeDesc: 'Live case status',
-    easyAccess: 'Easy Access',
-    easyAccessDesc: 'No account needed',
     // Progress stages
     progressReceived: 'Application Received',
     progressReview: 'Under Initial Review',
@@ -441,13 +434,6 @@ reassign: 'Reassign',
     copyright: '© 2026 የፌዴራል ቤቶች ኮርፖሬሽን። መብቱ በሕግ የተጠበቀ ነው።',
     version: 'DWTRS v1.0',
     tryExample: 'ሞክሩ፡',
-    // Trust signals
-    secure: 'ደህንነቱ የተጠበቀ',
-    secureDesc: 'ውሂብዎ ተጠብቋል',
-    realTime: 'ወቅታዊ',
-    realTimeDesc: 'ቀጥታ ሁኔታ',
-    easyAccess: 'ቀላል ዳሰሳ',
-    easyAccessDesc: 'መለያ አያስፈልግም',
     // Progress stages
     progressReceived: 'ማቅረቢያ ተቀብሏል',
     progressReview: 'ቀደምት ግምገማ',

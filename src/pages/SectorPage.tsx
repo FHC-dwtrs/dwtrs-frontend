@@ -1130,14 +1130,14 @@ export default function SectorPage({
             label={t('kpi_totalCases')}
             value={myCases.length}
             icon="📥"
-            accent="#2563EB"
+            accent="#416A7A"
           />
 
           <KpiCard
             label="Rejected Cases"
             value={rejectedCases.length}
             icon="❌"
-            accent="#DC2626"
+            accent="#A66C6C"
             onClick={() => {
               setFilterStatus(
                 'REJECTED'
@@ -1159,7 +1159,7 @@ export default function SectorPage({
               awaitingDecision.length
             }
             icon="⏳"
-            accent="#D97706"
+            accent="#A88658"
             onClick={() =>
               setPage('cases')
             }
@@ -1178,7 +1178,7 @@ export default function SectorPage({
             label={t('kpi_approved')}
             value={approvedCases.length}
             icon="✅"
-            accent="#16A34A"
+            accent="#5F8A72"
           />
 
         </div>
@@ -1201,7 +1201,7 @@ export default function SectorPage({
               onClick={() =>
                 setPage('cases')
               }
-              className="text-xs text-[#1E4B8F] font-semibold hover:underline"
+              className="text-xs text-[#416A7A] font-semibold hover:underline"
             >
               {t('viewAll')}
             </button>
@@ -1227,7 +1227,7 @@ export default function SectorPage({
 
                     <div className="flex items-center gap-2">
 
-                      <span className="font-mono text-xs font-semibold text-[#1E4B8F]">
+                      <span className="font-mono text-xs font-semibold text-[#416A7A]">
                         {c.trackingNumber}
                       </span>
 
@@ -1288,7 +1288,7 @@ export default function SectorPage({
               onClick={() =>
                 setPage('directorates')
               }
-              className="text-xs text-[#1E4B8F] font-semibold hover:underline"
+              className="text-xs text-[#416A7A] font-semibold hover:underline"
             >
               Manage Directorates →
             </button>
@@ -1542,7 +1542,7 @@ export default function SectorPage({
             setSearchQ(e.target.value)
           }
           placeholder="Search…"
-          className="px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#1E4B8F]/20"
+          className="px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#416A7A]/20"
         />
 
       </div>
@@ -1560,7 +1560,7 @@ export default function SectorPage({
             className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-all ${
               filterStatus ===
               status.value
-                ? 'bg-[#1E4B8F] text-white'
+                ? 'bg-[#416A7A] text-white'
                 : 'bg-white border border-gray-200 text-gray-600 hover:border-gray-300'
             }`}
           >
@@ -1651,7 +1651,7 @@ function CasesSimpleTable({
               className="border-b border-gray-50 hover:bg-gray-50 cursor-pointer transition-colors"
             >
 
-              <td className="px-5 py-3.5 font-mono font-semibold text-[#1E4B8F] text-xs">
+              <td className="px-5 py-3.5 font-mono font-semibold text-[#416A7A] text-xs">
                 {c.id}
               </td>
 
@@ -1679,7 +1679,7 @@ function CasesSimpleTable({
                     e.stopPropagation()
                     onOpen(c)
                   }}
-                  className="text-xs text-[#1E4B8F] font-semibold hover:underline"
+                  className="text-xs text-[#416A7A] font-semibold hover:underline"
                 >
                   {t('view')}
                 </button>
@@ -1739,7 +1739,7 @@ function TransferHistoryTable({
               className="border-b border-gray-50"
             >
 
-              <td className="px-5 py-3.5 font-mono font-semibold text-[#1E4B8F] text-xs">
+              <td className="px-5 py-3.5 font-mono font-semibold text-[#416A7A] text-xs">
                 {tr.trackingNumber}
               </td>
 
@@ -1869,7 +1869,7 @@ function ReportsTabs({
 
           <button
             onClick={onRefresh}
-            className="mt-4 px-4 py-2 rounded-lg bg-[#1E4B8F] text-white text-sm font-semibold hover:bg-[#173b72]"
+            className="mt-4 px-4 py-2 rounded-lg bg-[#416A7A] text-white text-sm font-semibold hover:bg-[#345A68]"
           >
             Try Again
           </button>
@@ -1932,7 +1932,7 @@ function ReportsTabs({
                 e.target.value as ReportPeriod
               )
             }
-            className="px-3 py-2 rounded-lg border border-gray-200 bg-white text-sm font-semibold text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#1E4B8F]/20"
+            className="px-3 py-2 rounded-lg border border-gray-200 bg-white text-sm font-semibold text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#416A7A]/20"
           >
 
             <option value="DAILY">
@@ -2623,7 +2623,7 @@ function PendingCasesTable({
               className="border-b border-gray-50 hover:bg-gray-50"
             >
 
-              <td className="px-4 py-3.5 font-mono text-xs font-semibold text-[#1E4B8F] whitespace-nowrap">
+              <td className="px-4 py-3.5 font-mono text-xs font-semibold text-[#416A7A] whitespace-nowrap">
                 {item.trackingNumber}
               </td>
 

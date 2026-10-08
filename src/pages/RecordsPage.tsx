@@ -54,8 +54,6 @@ import {
 
 import type { CaseHistoryEntry, CaseRecord, CaseRemarkItem } from '../types'
 import { useLanguage } from '../i18n'
-import { getCaseById } from '../api/cases.api'
-import { NotificationsPageView } from '../components/notifications'
 
 interface Props {
   page: string
@@ -225,28 +223,6 @@ export default function RecordsPage({ page, setPage }: Props) {
         onSuccess={() => {
           loadCases()
           setPage('cases')
-        }}
-      />
-    )
-  }
-
-  // ─────────────────────────────────────────────
-  // NOTIFICATIONS (real API)
-  // ─────────────────────────────────────────────
-
-  if (page === 'notifications') {
-    return (
-      <NotificationsPageView
-        onOpenCase={async caseId => {
-          try {
-            const res = await getCaseById(caseId)
-
-            if (res.data) {
-              openCase(mapCaseToRecord(res.data))
-            }
-          } catch (err) {
-            console.error('Failed to open case from notification:', err)
-          }
         }}
       />
     )
@@ -471,7 +447,7 @@ onArchive={(archived) => {
       <div className="p-6 space-y-6">
 
         {/* Welcome */}
-        <div className="bg-gradient-to-r from-[#1E4B8F] to-[#2558A8] rounded-2xl p-6 text-white flex items-center justify-between">
+        <div className="bg-gradient-to-r from-[#416A7A] to-[#4E7C8D] rounded-2xl p-6 text-white flex items-center justify-between">
           <div>
             <p className="text-blue-200 text-sm font-semibold mb-1">
               {t('goodMorning')}, Archive staff
@@ -493,7 +469,7 @@ onArchive={(archived) => {
             onClick={() => setPage('register')}
             variant="secondary"
             size="lg"
-            className="bg-white text-[#1E4B8F] border-0 font-black shadow-lg"
+            className="bg-white text-[#416A7A] border-0 font-black shadow-lg"
           >
             ➕ Register New Case
           </Btn>
@@ -513,14 +489,14 @@ onArchive={(archived) => {
             label={t('kpi_totalActive')}
             value={totalActive}
             icon="🔄"
-            accent="#1E4B8F"
+            accent="#416A7A"
           />
 
           <KpiCard
             label={t('kpi_archivedCases')}
             value={archivedCount}
             icon="🗃"
-            accent="#6B7280"
+            accent="#718087"
           />
 
           <KpiCard
@@ -529,7 +505,7 @@ onArchive={(archived) => {
               c => c.status === 'SUBMITTED'
             ).length}
             icon="⚠️"
-            accent="#D97706"
+            accent="#A88658"
           />
 
         </div>
@@ -547,7 +523,7 @@ onArchive={(archived) => {
 
             <button
               onClick={() => setPage('cases')}
-              className="text-xs text-[#1E4B8F] font-semibold hover:underline"
+              className="text-xs text-[#416A7A] font-semibold hover:underline"
             >
               {t('viewAll')}
             </button>
@@ -592,7 +568,7 @@ onArchive={(archived) => {
               setSearchQ(e.target.value)
             }
             placeholder="Search…"
-            className="px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#1E4B8F]/20"
+            className="px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#416A7A]/20"
           />
 
           <Btn onClick={() => setPage('register')}>
@@ -681,7 +657,7 @@ function CasesTable({
               onClick={() => onOpen(c)}
               className="border-b border-gray-50 hover:bg-gray-50 cursor-pointer transition-colors"
             >
-              <td className="px-5 py-3.5 font-mono font-semibold text-[#1E4B8F] text-xs">
+              <td className="px-5 py-3.5 font-mono font-semibold text-[#416A7A] text-xs">
                 {c.id}
               </td>
 
@@ -710,7 +686,7 @@ function CasesTable({
               </td>
 
               <td className="px-5 py-3.5">
-                <button className="text-xs text-[#1E4B8F] font-semibold hover:underline">
+                <button className="text-xs text-[#416A7A] font-semibold hover:underline">
                   {t('view')}
                 </button>
               </td>
@@ -1049,7 +1025,7 @@ function EditCaseForm({
                 Tracking Number
               </p>
               <div className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-3">
-                <p className="font-mono font-bold text-[#1E4B8F]">
+                <p className="font-mono font-bold text-[#416A7A]">
                   {trackingNumber}
                 </p>
               </div>
@@ -1224,7 +1200,7 @@ function EditCaseForm({
               </p>
             </div>
 
-            <label className="block border-2 border-dashed border-gray-200 rounded-xl p-5 text-center hover:border-[#1E4B8F]/40 transition-colors cursor-pointer bg-gray-50">
+            <label className="block border-2 border-dashed border-gray-200 rounded-xl p-5 text-center hover:border-[#416A7A]/40 transition-colors cursor-pointer bg-gray-50">
               <input
                 type="file"
                 className="hidden"
@@ -1239,7 +1215,7 @@ function EditCaseForm({
 
               {replacementDocument ? (
                 <>
-                  <p className="text-sm font-semibold text-[#1E4B8F]">
+                  <p className="text-sm font-semibold text-[#416A7A]">
                     {replacementDocument.name}
                   </p>
                   <p className="text-xs text-gray-400 mt-1">
@@ -1313,7 +1289,7 @@ function EditCaseForm({
                               attachment.attachmentId
                             )
                           }
-                          className="text-xs text-[#1E4B8F] font-semibold hover:underline flex-shrink-0"
+                          className="text-xs text-[#416A7A] font-semibold hover:underline flex-shrink-0"
                           disabled={saving}
                         >
                           Undo Delete
@@ -1336,7 +1312,7 @@ function EditCaseForm({
 
                     {!deleted && (
                       <div className="mt-3">
-                        <label className="inline-flex items-center text-xs text-[#1E4B8F] font-semibold cursor-pointer">
+                        <label className="inline-flex items-center text-xs text-[#416A7A] font-semibold cursor-pointer">
                           <input
                             type="file"
                             className="hidden"
@@ -1370,7 +1346,7 @@ function EditCaseForm({
             Add Attachments
           </h3>
 
-          <label className="block border-2 border-dashed border-gray-200 rounded-xl p-5 text-center hover:border-[#1E4B8F]/40 transition-colors cursor-pointer bg-gray-50">
+          <label className="block border-2 border-dashed border-gray-200 rounded-xl p-5 text-center hover:border-[#416A7A]/40 transition-colors cursor-pointer bg-gray-50">
             <input
               type="file"
               multiple
@@ -1806,13 +1782,13 @@ function RegisterCaseForm({
             {t('caseRegisteredDesc')}
           </p>
 
-          <div className="bg-[#EEF4FF] rounded-xl p-4 mb-6">
+          <div className="bg-[#EAF1F3] rounded-xl p-4 mb-6">
 
             <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-1">
               {t('trackingNumber')}
             </p>
 
-            <p className="text-2xl font-black text-[#1E4B8F] font-mono">
+            <p className="text-2xl font-black text-[#416A7A] font-mono">
               {registrationResult?.trackingNumber}
             </p>
 
@@ -1907,7 +1883,7 @@ function RegisterCaseForm({
                 step > i + 1
                   ? 'bg-green-500 text-white'
                   : step === i + 1
-                    ? 'bg-[#1E4B8F] text-white'
+                    ? 'bg-[#416A7A] text-white'
                     : 'bg-gray-200 text-gray-500'
               }`}
             >
@@ -2146,7 +2122,7 @@ function RegisterCaseForm({
                 {t('label_mainDoc')} *
               </p>
 
-              <label className="block border-2 border-dashed border-gray-200 rounded-xl p-6 text-center hover:border-[#1E4B8F]/40 transition-colors cursor-pointer bg-gray-50">
+              <label className="block border-2 border-dashed border-gray-200 rounded-xl p-6 text-center hover:border-[#416A7A]/40 transition-colors cursor-pointer bg-gray-50">
 
                 <input
                   type="file"
@@ -2170,7 +2146,7 @@ function RegisterCaseForm({
 
                 {mainDocument ? (
                   <>
-                    <p className="text-sm font-semibold text-[#1E4B8F]">
+                    <p className="text-sm font-semibold text-[#416A7A]">
                       {mainDocument.name}
                     </p>
 
@@ -2205,7 +2181,7 @@ function RegisterCaseForm({
                 {t('label_attachments')}
               </p>
 
-              <label className="block border-2 border-dashed border-gray-200 rounded-xl p-4 text-center hover:border-[#1E4B8F]/40 transition-colors cursor-pointer bg-gray-50">
+              <label className="block border-2 border-dashed border-gray-200 rounded-xl p-4 text-center hover:border-[#416A7A]/40 transition-colors cursor-pointer bg-gray-50">
 
                 <input
                   type="file"
@@ -2329,7 +2305,7 @@ function RegisterCaseForm({
                       }}
                       className={`w-full text-left px-4 py-3 rounded-xl border-2 text-sm font-medium transition-all ${
                         sector === s.unitId
-                          ? 'border-[#1E4B8F] bg-[#EEF4FF] text-[#1E4B8F]'
+                          ? 'border-[#416A7A] bg-[#EAF1F3] text-[#416A7A]'
                           : 'border-gray-200 text-gray-700 hover:border-gray-300 bg-white'
                       }`}
                     >
@@ -2347,7 +2323,7 @@ function RegisterCaseForm({
                     Selected sector
                   </p>
 
-                  <p className="text-sm font-semibold text-[#1E4B8F]">
+                  <p className="text-sm font-semibold text-[#416A7A]">
                     {selectedSector.name}
                   </p>
 
@@ -3174,7 +3150,7 @@ async function confirmTransfer() {
                   </Btn>
 
                   {c.rawStatus ===
-                    'RETURNED' && (
+                    'SENT_BACK_FOR_CORRECTION' && (
                     <Btn
                       size="sm"
                       variant="secondary"
@@ -3514,7 +3490,7 @@ async function confirmTransfer() {
                     e.target.checked
                   )
                 }
-                className="w-4 h-4 text-[#1E4B8F] border-gray-300 rounded focus:ring-[#1E4B8F]"
+                className="w-4 h-4 text-[#416A7A] border-gray-300 rounded focus:ring-[#416A7A]"
               />
 
               <label
@@ -3773,7 +3749,7 @@ async function confirmTransfer() {
                 className={`w-full text-left px-4 py-3 rounded-xl border-2 text-sm font-medium transition-all ${
                   selectedUnitId ===
                   u.unitId
-                    ? 'border-[#1E4B8F] bg-[#EEF4FF] text-[#1E4B8F]'
+                    ? 'border-[#416A7A] bg-[#EAF1F3] text-[#416A7A]'
                     : 'border-gray-200 text-gray-700 hover:border-gray-300 bg-white'
                 }`}
               >
@@ -3891,7 +3867,7 @@ async function confirmTransfer() {
             className={`w-full text-left px-4 py-3 rounded-xl border-2 text-sm font-medium transition-all ${
               selectedTransferUnitId ===
               unit.unitId
-                ? 'border-[#1E4B8F] bg-[#EEF4FF] text-[#1E4B8F]'
+                ? 'border-[#416A7A] bg-[#EAF1F3] text-[#416A7A]'
                 : 'border-gray-200 text-gray-700 hover:border-gray-300 bg-white'
             }`}
           >
@@ -4127,7 +4103,7 @@ function RemarkBubble({ remark }: { remark: CaseRemarkItem }) {
 
   return (
     <div className="flex gap-3">
-      <div className="w-8 h-8 rounded-full bg-[#1E4B8F] text-white text-xs font-bold flex items-center justify-center flex-shrink-0">
+      <div className="w-8 h-8 rounded-full bg-[#416A7A] text-white text-xs font-bold flex items-center justify-center flex-shrink-0">
         {initials}
       </div>
       <div className="flex-1 min-w-0">

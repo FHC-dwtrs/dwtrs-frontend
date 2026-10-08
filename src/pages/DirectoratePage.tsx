@@ -20,8 +20,6 @@ import {
   type PreviouslyHandledCaseItem,
 } from '../api/workflow.api'
 import { getMe, type MeUser } from '../api/auth.api'
-import { getCaseById } from '../api/cases.api'
-import { NotificationsPageView } from '../components/notifications'
 
 interface Props {
   page: string
@@ -257,7 +255,7 @@ export default function DirectoratePage({ page, setPage }: Props) {
   // ============================================================
   // TRANSFERS
   // Cases this directorate sent to another directorate
-  // ============================================================
+  // ===================================================F=========
 
   const transfers: TransferEvent[] = previouslyHandled
     .filter(
@@ -296,28 +294,6 @@ export default function DirectoratePage({ page, setPage }: Props) {
   function openGroupCases(unitId: string) {
     setSelectedGroupId(unitId)
     setPage('group-cases')
-  }
-
-  // ============================================================
-  // NOTIFICATIONS (real API)
-  // ============================================================
-
-  if (page === 'notifications') {
-    return (
-      <NotificationsPageView
-        onOpenCase={async caseId => {
-          try {
-            const res = await getCaseById(caseId)
-
-            if (res.data) {
-              openCase(mapCaseToRecord(res.data))
-            }
-          } catch (err) {
-            console.error('Failed to open case from notification:', err)
-          }
-        }}
-      />
-    )
   }
 
   // ============================================================
@@ -505,7 +481,7 @@ export default function DirectoratePage({ page, setPage }: Props) {
                         }
                         className="border-b border-gray-50 hover:bg-gray-50 cursor-pointer transition-colors"
                       >
-                        <td className="px-5 py-3.5 font-mono font-semibold text-[#1E4B8F] text-xs">
+                        <td className="px-5 py-3.5 font-mono font-semibold text-[#416A7A] text-xs">
                           {c.id}
                         </td>
 
@@ -528,7 +504,7 @@ export default function DirectoratePage({ page, setPage }: Props) {
                         </td>
 
                         <td className="px-5 py-3.5">
-                          <button className="text-xs text-[#1E4B8F] font-semibold hover:underline">
+                          <button className="text-xs text-[#416A7A] font-semibold hover:underline">
                             View
                           </button>
                         </td>
@@ -606,7 +582,7 @@ export default function DirectoratePage({ page, setPage }: Props) {
                       key={tr.assignmentId}
                       className="border-b border-gray-50"
                     >
-                      <td className="px-5 py-3.5 font-mono font-semibold text-[#1E4B8F] text-xs">
+                      <td className="px-5 py-3.5 font-mono font-semibold text-[#416A7A] text-xs">
                         {tr.trackingNumber}
                       </td>
 
@@ -670,7 +646,7 @@ export default function DirectoratePage({ page, setPage }: Props) {
             label={t('kpi_pendingGroups')}
             value={awaitingDecision.length}
             icon="⏳"
-            accent="#D97706"
+            accent="#A88658"
             onClick={() => setPage('cases')}
           />
 
@@ -678,7 +654,7 @@ export default function DirectoratePage({ page, setPage }: Props) {
             label="Needs Assignment"
             value={needsAssignment.length}
             icon="📥"
-            accent="#2563EB"
+            accent="#416A7A"
             onClick={() => setPage('cases')}
           />
         </div>
@@ -695,7 +671,7 @@ export default function DirectoratePage({ page, setPage }: Props) {
 
               <button
                 onClick={() => setPage('cases')}
-                className="text-xs text-[#1E4B8F] font-semibold hover:underline"
+                className="text-xs text-[#416A7A] font-semibold hover:underline"
               >
                 {t('viewAll')}
               </button>
@@ -715,7 +691,7 @@ export default function DirectoratePage({ page, setPage }: Props) {
                     >
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-0.5">
-                          <span className="font-mono text-xs font-semibold text-[#1E4B8F]">
+                          <span className="font-mono text-xs font-semibold text-[#416A7A]">
                             {c.trackingNumber}
                           </span>
 
@@ -784,7 +760,7 @@ export default function DirectoratePage({ page, setPage }: Props) {
             <div className="px-6 py-3 border-t border-gray-50">
               <button
                 onClick={() => setPage('groups')}
-                className="text-xs text-[#1E4B8F] font-semibold hover:underline"
+                className="text-xs text-[#416A7A] font-semibold hover:underline"
               >
                 {t('manageGroups')}
               </button>
@@ -815,7 +791,7 @@ export default function DirectoratePage({ page, setPage }: Props) {
             onClick={() => setFilterStatus(s)}
             className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-all ${
               filterStatus === s
-                ? 'bg-[#1E4B8F] text-white'
+                ? 'bg-[#416A7A] text-white'
                 : 'bg-white border border-gray-200 text-gray-600 hover:border-gray-300'
             }`}
           >
@@ -870,7 +846,7 @@ export default function DirectoratePage({ page, setPage }: Props) {
                     onClick={() => openCase(c)}
                     className="border-b border-gray-50 hover:bg-gray-50 cursor-pointer transition-colors"
                   >
-                    <td className="px-5 py-3.5 font-mono font-semibold text-[#1E4B8F] text-xs">
+                    <td className="px-5 py-3.5 font-mono font-semibold text-[#416A7A] text-xs">
                       {c.id}
                     </td>
 
@@ -893,7 +869,7 @@ export default function DirectoratePage({ page, setPage }: Props) {
                     </td>
 
                     <td className="px-5 py-3.5">
-                      <button className="text-xs text-[#1E4B8F] font-semibold hover:underline">
+                      <button className="text-xs text-[#416A7A] font-semibold hover:underline">
                         {t('review')}
                       </button>
                     </td>

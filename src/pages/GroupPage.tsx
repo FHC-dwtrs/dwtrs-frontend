@@ -183,14 +183,14 @@ export default function GroupPage({ page, setPage }: Props) {
                   className="bg-white rounded-xl border border-gray-100 shadow-sm p-4"
                 >
                   <div className="flex items-center gap-2 mb-2">
-                    <div className="w-7 h-7 rounded-full bg-[#1E4B8F]/10 flex items-center justify-center text-xs font-bold text-[#1E4B8F]">
+                    <div className="w-7 h-7 rounded-full bg-[#416A7A]/10 flex items-center justify-center text-xs font-bold text-[#416A7A]">
                       {r.author?.[0] ?? '?'}
                     </div>
 
                     <div>
                       <p className="text-xs font-bold text-gray-800">
                         {r.author} —{' '}
-                        <span className="text-[#1E4B8F] font-mono">
+                        <span className="text-[#416A7A] font-mono">
                           {r.caseId}
                         </span>
                       </p>
@@ -294,7 +294,7 @@ export default function GroupPage({ page, setPage }: Props) {
                 className="bg-white rounded-xl border border-red-100 shadow-sm p-5 cursor-pointer hover:shadow-md transition-shadow"
               >
                 <div className="flex items-center gap-3 mb-2">
-                  <span className="font-mono text-xs font-bold text-[#1E4B8F]">
+                  <span className="font-mono text-xs font-bold text-[#416A7A]">
                     {c.id}
                   </span>
 
@@ -392,28 +392,28 @@ export default function GroupPage({ page, setPage }: Props) {
             label={t('kpi_newCases')}
             value={newCases}
             icon="🆕"
-            accent="#2563EB"
+            accent="#416A7A"
           />
 
           <KpiCard
             label={t('kpi_pending')}
             value={pendingCases}
             icon="⏳"
-            accent="#D97706"
+            accent="#A88658"
           />
 
           <KpiCard
             label={t('kpi_returned')}
             value={returnedCases}
             icon="↩️"
-            accent="#EA580C"
+            accent="#81738B"
           />
 
           <KpiCard
             label={t('kpi_delayed')}
             value={delayedCases}
             icon="⚠️"
-            accent="#DC2626"
+            accent="#A66C6C"
             onClick={() => setPage('delayed')}
           />
         </div>
@@ -430,7 +430,7 @@ export default function GroupPage({ page, setPage }: Props) {
 
             <button
               onClick={() => setPage('cases')}
-              className="text-xs text-[#1E4B8F] font-semibold hover:underline"
+              className="text-xs text-[#416A7A] font-semibold hover:underline"
             >
               {t('viewAll')}
             </button>
@@ -460,7 +460,7 @@ export default function GroupPage({ page, setPage }: Props) {
                 >
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-0.5">
-                      <span className="font-mono text-xs font-semibold text-[#1E4B8F]">
+                      <span className="font-mono text-xs font-semibold text-[#416A7A]">
                         {c.id}
                       </span>
 
@@ -535,7 +535,7 @@ export default function GroupPage({ page, setPage }: Props) {
               onClick={() => setFilterStatus(value)}
               className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-all ${
                 filterStatus === value
-                  ? 'bg-[#1E4B8F] text-white'
+                  ? 'bg-[#416A7A] text-white'
                   : 'bg-white border border-gray-200 text-gray-600 hover:border-gray-300'
               }`}
             >
@@ -586,7 +586,7 @@ export default function GroupPage({ page, setPage }: Props) {
                     onClick={() => openCase(c)}
                     className="border-b border-gray-50 hover:bg-gray-50 cursor-pointer transition-colors"
                   >
-                    <td className="px-5 py-3.5 font-mono font-semibold text-[#1E4B8F] text-xs">
+                    <td className="px-5 py-3.5 font-mono font-semibold text-[#416A7A] text-xs">
                       {c.id}
                     </td>
 
@@ -607,7 +607,7 @@ export default function GroupPage({ page, setPage }: Props) {
                     </td>
 
                     <td className="px-5 py-3.5">
-                      <button className="text-xs text-[#1E4B8F] font-semibold hover:underline">
+                      <button className="text-xs text-[#416A7A] font-semibold hover:underline">
                         {c.status === 'New'
                           ? t('open')
                           : c.status === 'Returned'
