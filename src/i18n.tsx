@@ -56,8 +56,6 @@ const T = {
     checkAndRetry: 'Please double-check the number and try again.',
     needHelp: 'Need help?',
     staffLogin: 'Staff Login →',
-    copyright: '© 2026 Federal Housing Corporation. All rights reserved.',
-    version: 'DWTRS v1.0',
     tryExample: 'Try:',
     // Progress stages
     progressReceived: 'Application Received',
@@ -431,8 +429,6 @@ reassign: 'Reassign',
     checkAndRetry: 'ቁጥሩን አረጋግጠው እንደገና ሞክሩ።',
     needHelp: 'እርዳታ ይፈልጋሉ?',
     staffLogin: 'የሠራተኞች መግቢያ →',
-    copyright: '© 2026 የፌዴራል ቤቶች ኮርፖሬሽን። መብቱ በሕግ የተጠበቀ ነው።',
-    version: 'DWTRS v1.0',
     tryExample: 'ሞክሩ፡',
     // Progress stages
     progressReceived: 'ማቅረቢያ ተቀብሏል',
