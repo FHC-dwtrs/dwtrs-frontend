@@ -68,7 +68,7 @@ export default function LoginPage({ onLogin, onBack }: Props) {
       </div>
 
       {/* ── Left branding panel ─────────────────────────────── */}
-      <div className="hidden lg:flex w-[42%] bg-[#416A7A] text-white flex-col justify-between p-12 relative overflow-hidden flex-shrink-0">
+      <div className="hidden lg:flex w-[42%] bg-[#416A7A] text-white flex-col justify-start p-12 relative overflow-hidden flex-shrink-0">
         {/* photo texture, tinted into the brand color */}
         <img src={fhcPhoto} alt="" className="absolute inset-0 w-full h-full object-cover opacity-40 mix-blend-luminosity" />
         <div className="absolute inset-0 bg-gradient-to-br from-[#416A7A]/85 via-[#416A7A]/80 to-[#2B4C58]/90" />
@@ -83,49 +83,30 @@ export default function LoginPage({ onLogin, onBack }: Props) {
         </div>
 
         <div className="relative animate-[fadeUp_0.6s_ease-out_both]">
-          <div className="flex items-center gap-3 mb-14">
-            <div className="w-11 h-11 bg-white rounded-xl overflow-hidden ring-1 ring-white/30 flex-shrink-0">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 bg-white rounded-xl overflow-hidden ring-1 ring-white/30 flex-shrink-0">
               <img src={fhcLogo} alt="FHC" className="w-full h-full object-cover" />
             </div>
             <div>
               <p className="font-black text-xl leading-none" style={{ fontFamily: 'var(--font-display)' }}>{t('appName')}</p>
-              <p className="text-blue-200 text-xs mt-0.5">{t('appFull')}</p>
+              <p className="text-blue-200 text-xs mt-1">{t('appFull')}</p>
             </div>
           </div>
-
-          <h1 className="text-4xl font-black leading-tight mb-5" style={{ fontFamily: 'var(--font-display)' }}>
-            {t('brandingTagline')}
-          </h1>
-          <p className="text-blue-200 text-base leading-relaxed">
-            {t('brandingDesc')}
-          </p>
         </div>
 
-        <div className="relative space-y-3.5 animate-[fadeUp_0.6s_ease-out_0.2s_both]">
-          {[
-            { icon: '📋', key: 'feature1' as const },
-            { icon: '🏢', key: 'feature2' as const },
-            { icon: '🔄', key: 'feature3' as const },
-            { icon: '🔐', key: 'feature4' as const },
-          ].map(f => (
-            <div key={f.key} className="flex items-center gap-3 text-sm text-blue-100">
-              <span className="text-base">{f.icon}</span>
-              {t(f.key)}
-            </div>
-          ))}
-        </div>
       </div>
 
       {/* ── Right login panel ───────────────────────────────── */}
       <div className="flex-1 flex flex-col overflow-y-auto">
-        <div className="flex-1 flex flex-col justify-start p-8 lg:p-12 max-w-xl mx-auto w-full animate-[fadeUp_0.6s_ease-out_0.1s_both]">
-          <div className="flex items-center justify-between mb-8">
+        <div className="min-h-full flex flex-col p-8 lg:p-12 max-w-lg mx-auto w-full animate-[fadeUp_0.6s_ease-out_0.1s_both]">
+          <div className="flex items-center justify-between mb-6 flex-shrink-0">
             <button onClick={onBack} className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 transition-colors">
               {t('publicPortalBack')}
             </button>
             <LangToggle className="border-gray-200 text-gray-600 hover:border-[#416A7A] hover:text-[#416A7A] bg-white" />
           </div>
 
+          <div className="flex-1 flex flex-col justify-center py-8">
           {/* Mobile branding (left logo panel is hidden below lg) */}
           <div className="flex items-center gap-3 mb-6 lg:hidden">
             <div className="w-11 h-11 bg-white rounded-xl overflow-hidden ring-1 ring-gray-200 flex-shrink-0">
@@ -137,12 +118,12 @@ export default function LoginPage({ onLogin, onBack }: Props) {
             </div>
           </div>
 
-          <h2 className="text-2xl font-black text-gray-900 mb-1" style={{ fontFamily: 'var(--font-display)' }}>{t('staffLoginTitle')}</h2>
-          <p className="text-gray-500 text-sm mb-7">{t('staffLoginSubtitle')}</p>
+          <h2 className="text-3xl font-black text-gray-900 mb-2" style={{ fontFamily: 'var(--font-display)' }}>{t('staffLoginTitle')}</h2>
+          <p className="text-gray-500 text-base mb-9">{t('staffLoginSubtitle')}</p>
 
-          <form onSubmit={handleSubmit} className="space-y-3.5 mb-8">
+          <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-xs font-bold text-gray-600 mb-1.5">Email</label>
+              <label className="block text-sm font-bold text-gray-600 mb-2">Email</label>
               <input
                   type="text"
                   value={email}
@@ -151,23 +132,24 @@ export default function LoginPage({ onLogin, onBack }: Props) {
                     setError('')
                   }}
                   placeholder={lang === 'am' ? 'የተጠቃሚ ስምዎን ያስገቡ' : 'Enter your Email'}
-                  className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 bg-white text-sm placeholder-gray-400 focus:outline-none focus:border-[#416A7A] focus:ring-4 focus:ring-[#416A7A]/10 transition-all"
+                  className="w-full px-4 py-3.5 rounded-xl border-2 border-gray-200 bg-white text-base placeholder-gray-400 focus:outline-none focus:border-[#416A7A] focus:ring-4 focus:ring-[#416A7A]/10 transition-all"
                 />
             </div>
             <div>
-              <label className="block text-xs font-bold text-gray-600 mb-1.5">{t('password')}</label>
+              <label className="block text-sm font-bold text-gray-600 mb-2">{t('password')}</label>
               <input type="password" value={password} onChange={e => { setPassword(e.target.value); setError('') }}
                 placeholder={lang === 'am' ? 'የይለፍ ቃልዎን ያስገቡ' : 'Enter your password'}
-                className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 bg-white text-sm placeholder-gray-400 focus:outline-none focus:border-[#416A7A] focus:ring-4 focus:ring-[#416A7A]/10 transition-all" />
+                className="w-full px-4 py-3.5 rounded-xl border-2 border-gray-200 bg-white text-base placeholder-gray-400 focus:outline-none focus:border-[#416A7A] focus:ring-4 focus:ring-[#416A7A]/10 transition-all" />
             </div>
-            {error && <p className="text-xs text-red-600 bg-red-50 px-3 py-2 rounded-lg">{error}</p>}
+            {error && <p className="text-sm text-red-600 bg-red-50 px-3 py-2.5 rounded-lg">{error}</p>}
             <button type="submit" disabled={loading}
-              className="w-full py-3 bg-[#416A7A] text-white font-bold rounded-xl hover:bg-[#345A68] disabled:opacity-60 transition-all flex items-center justify-center gap-2">
+              className="w-full py-4 bg-[#416A7A] text-white text-base font-bold rounded-xl hover:bg-[#345A68] disabled:opacity-60 transition-all flex items-center justify-center gap-2">
               {loading
                 ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                 : t('signIn')}
             </button>
           </form>
+          </div>
         </div>
       </div>
     </div>
